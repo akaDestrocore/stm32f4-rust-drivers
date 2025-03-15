@@ -39,7 +39,6 @@ fn main() -> ! {
         gpio_write_pin!(gpio_handle.pgpiox, GPIO_Pin::GPIO_PIN_14, 1);
         gpio_write_pin!(gpio_handle.pgpiox, GPIO_Pin::GPIO_PIN_15, 1);
     }
-
     loop {
         for _ in 0..500_000 {
             cortex_m::asm::nop();
