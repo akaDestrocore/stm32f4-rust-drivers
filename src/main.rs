@@ -4,51 +4,95 @@
 use core::panic::PanicInfo;
 use cortex_m_rt::entry;
 use stm32f4_rust_drivers::{
-    stm32f4_gpio::{GPIOPort, GPIO_Mode, GPIO_OutputType, GPIO_Pin, GPIO_PuPd, GPIO_Speed, GPIO_Handle, GPIO},
-    gpio_init, gpio_toggle_pin, gpio_write_pin
+    stm32f4xx::{TIM6, RCC},
+    stm32f4_rcc::init_max_performance_clocks,
 };
 
 #[cortex_m_rt::pre_init]
-unsafe fn pre_init() {
+unsafe fn __pre_init() {
 
+}
+
+// TIM6 init
+fn init_delay_timer() {
+    unsafe {
+        (*RCC).APB1ENR |= 1 << 4;
+        
+        (*TIM6).PSC = 42000 - 1; // 42 MHz / 42000 = 1 kHz (1 ms period)
+    }
+}
+
+fn delay_ms(ms: u32) {
+    unsafe {
+        (*TIM6).ARR = ms - 1;
+        (*TIM6).CNT = 0;
+        (*TIM6).SR = 0;
+        (*TIM6).CR1 |= 1;
+        while ((*TIM6).SR & 0x1) == 0 {
+            cortex_m::asm::nop();
+        }
+        (*TIM6).CR1 &= !1;
+    }
 }
 
 #[entry]
 fn main() -> ! {
-    let gpio_handle: GPIO_Handle<'_> = gpio_init!(
-        GPIOPort::GPIOD,
-        GPIO_Pin::GPIO_PIN_12,
-        GPIO_Mode::GPIO_MODE_OUTPUT,
-        GPIO_Speed::GPIO_SPEED_FREQ_VERY_HIGH,
-        GPIO_PuPd::GPIO_NOPULL,
-        GPIO_OutputType::GPIO_OUTPUT_PP
-    );
-
-    let _gpio_handle2: GPIO_Handle<'_> = gpio_init!(
-        GPIOPort::GPIOD,
-        GPIO_Pin::GPIO_PIN_13,
-        GPIO_Mode::GPIO_MODE_OUTPUT,
-        GPIO_Speed::GPIO_SPEED_FREQ_VERY_HIGH,
-        GPIO_PuPd::GPIO_NOPULL,
-        GPIO_OutputType::GPIO_OUTPUT_PP
-    );
-
+    let _ = init_max_performance_clocks();
+    init_delay_timer();
     unsafe {
-        gpio_write_pin!(gpio_handle.pgpiox, GPIO_Pin::GPIO_PIN_12, 1);
-        gpio_write_pin!(gpio_handle.pgpiox, GPIO_Pin::GPIO_PIN_13, 1);
-        gpio_write_pin!(gpio_handle.pgpiox, GPIO_Pin::GPIO_PIN_14, 1);
-        gpio_write_pin!(gpio_handle.pgpiox, GPIO_Pin::GPIO_PIN_15, 1);
+        (*RCC).AHB1ENR |= 1 << 3;
     }
+    
+    unsafe {
+        let gpiod: *mut stm32f4_rust_drivers::stm32f4xx::GPIORegDef = stm32f4_rust_drivers::stm32f4xx::GPIOD;
+        
+        // green
+        (*gpiod).MODER &= !(0x3 << (12 * 2)); // reset bits
+        (*gpiod).MODER |= 0x1 << (12 * 2);    // output
+        
+        // orange
+        (*gpiod).MODER &= !(0x3 << (13 * 2));
+        (*gpiod).MODER |= 0x1 << (13 * 2);
+        
+        // Pred
+        (*gpiod).MODER &= !(0x3 << (14 * 2));
+        (*gpiod).MODER |= 0x1 << (14 * 2);
+        
+        // blue
+        (*gpiod).MODER &= !(0x3 << (15 * 2));
+        (*gpiod).MODER |= 0x1 << (15 * 2);
+        
+        // high speed
+        (*gpiod).OSPEEDR |= 0x3 << (12 * 2);
+        (*gpiod).OSPEEDR |= 0x3 << (13 * 2);
+        (*gpiod).OSPEEDR |= 0x3 << (14 * 2);
+        (*gpiod).OSPEEDR |= 0x3 << (15 * 2);
+        
+        (*gpiod).OTYPER &= !(0x1 << 12);
+        (*gpiod).OTYPER &= !(0x1 << 13);
+        (*gpiod).OTYPER &= !(0x1 << 14);
+        (*gpiod).OTYPER &= !(0x1 << 15);
+        
+        (*gpiod).PUPDR &= !(0x3 << (12 * 2));
+        (*gpiod).PUPDR &= !(0x3 << (13 * 2));
+        (*gpiod).PUPDR &= !(0x3 << (14 * 2));
+        (*gpiod).PUPDR &= !(0x3 << (15 * 2));
+    }
+    
+    // infinite loop
     loop {
-        for _ in 0..500_000 {
-            cortex_m::asm::nop();
-        }
-
         unsafe {
-            gpio_toggle_pin!(gpio_handle.pgpiox, GPIO_Pin::GPIO_PIN_12);
-            gpio_toggle_pin!(gpio_handle.pgpiox, GPIO_Pin::GPIO_PIN_13);
-            gpio_toggle_pin!(gpio_handle.pgpiox, GPIO_Pin::GPIO_PIN_14);
-            gpio_toggle_pin!(gpio_handle.pgpiox, GPIO_Pin::GPIO_PIN_15);
+            let gpiod: *mut stm32f4_rust_drivers::stm32f4xx::GPIORegDef = stm32f4_rust_drivers::stm32f4xx::GPIOD;
+            
+            // enable all LEDs
+            (*gpiod).BSRR = (1 << 12) | (1 << 13) | (1 << 14) | (1 << 15);
+            
+            delay_ms(2000);
+            
+            // disable all LEDs
+            (*gpiod).BSRR = (1 << (12 + 16)) | (1 << (13 + 16)) | (1 << (14 + 16)) | (1 << (15 + 16));
+            
+            delay_ms(2000);
         }
     }
 }

@@ -240,8 +240,8 @@ impl<'a> RccHandle<'a> {
             match config.hse_state {
                 HseState::Bypass => unsafe {
                     (*RCC).CR &= !(1 << 16);
-                    (*RCC).CR |= (1 << 18);
-                    (*RCC).CR |= (1 << 16);
+                    (*RCC).CR |= 1 << 18;
+                    (*RCC).CR |= 1 << 16;
                 },
                 HseState::On => unsafe {
                     (*RCC).CR |= 1 << 16;
