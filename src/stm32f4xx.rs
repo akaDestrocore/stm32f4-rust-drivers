@@ -1,32 +1,7 @@
-#![no_std]
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
-use core::ptr::addr_of;
-use core::ptr::NonNull;
-
-#[macro_export]
-macro_rules! READ_REG {
-    ($reg:expr) => {
-        unsafe { core::ptr::read_volatile(&$reg as *const _ as *const u32) }
-    };
-}
-
-#[macro_export]
-macro_rules! WRITE_REG {
-    ($reg:expr, $val:expr) => {
-        unsafe { core::ptr::write_volatile(&$reg as *const _ as *mut u32, $val) }
-    };
-}
-
-#[macro_export]
-macro_rules! MODIFY_REG {
-    ($reg:expr, $clearmask:expr, $setmask:expr) => {
-        let val = READ_REG!($reg);
-        WRITE_REG!($reg, (val & !($clearmask)) | ($setmask));
-    };
-}
 
 // IRQ numbers enum
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -238,10 +213,10 @@ pub const TIM10_BASE        : u32 = APB2PERIPH_BASE + 0x4400;
 pub const TIM11_BASE        : u32 = APB2PERIPH_BASE + 0x4800;
 
 // FSMC BANKx registers base address
-pub const FSMC_Bank1_R_BASE         : u32 = FSMC_R_BASE + 0x0000;
-pub const FSMC_Bank1E_R_BASE        : u32 = FSMC_R_BASE + 0x0104;
-pub const FSMC_Bank2_3_R_BASE       : u32 = FSMC_R_BASE + 0x0060;
-pub const FSMC_Bank4_R_BASE         : u32 = FSMC_R_BASE + 0x00A0;
+pub const FSMCBank1_R_BASE         : u32 = FSMC_R_BASE + 0x0000;
+pub const FSMCBank1E_R_BASE        : u32 = FSMC_R_BASE + 0x0104;
+pub const FSMCBank2_3_R_BASE       : u32 = FSMC_R_BASE + 0x0060;
+pub const FSMCBank4_R_BASE         : u32 = FSMC_R_BASE + 0x00A0;
 
 // Debug MCU registers base address
 pub const DBGMCU_BASE               : u32 = 0xE0042000;
@@ -278,7 +253,7 @@ pub const NVIC_BASE         : u32 = SCS_BASE + 0x0100;                      // N
 pub const SCB_BASE          : u32 = SCS_BASE + 0x0D00;                      // System Control Block Base Address
 
 #[repr(C)]
-pub struct TIM_2_5_Reg_Def {
+pub struct TIM_2_5_RegDef {
     pub CR1         : u32,          // Control register 1              Address offset: 0x00
     pub CR2         : u32,          // Control register 2              Address offset: 0x04
     pub SMCR        : u32,          // Slave mode control register     Address offset: 0x08
@@ -303,7 +278,7 @@ pub struct TIM_2_5_Reg_Def {
 }
 
 #[repr(C)]
-pub struct TIM_1_8_Reg_Def {
+pub struct TIM_1_8_RegDef {
     pub CR1         : u32,          // Control register 1              Address offset: 0x00
     pub CR2         : u32,          // Control register 2              Address offset: 0x04
     pub SMCR        : u32,          // Slave mode control register     Address offset: 0x08
@@ -327,7 +302,7 @@ pub struct TIM_1_8_Reg_Def {
 }
 
 #[repr(C)]
-pub struct TIM_6_7_Reg_Def {
+pub struct TIM_6_7_RegDef {
     pub CR1         : u32,          // Control register 1              Address offset: 0x00
     pub CR2         : u32,          // Control register 2              Address offset: 0x04
     pub RESERVED0   : u32,          // Reserved                        Address offset: 0x08
@@ -341,7 +316,7 @@ pub struct TIM_6_7_Reg_Def {
 }
 
 #[repr(C)]
-pub struct TIM_9_12_Reg_Def {
+pub struct TIM_9_12_RegDef {
     pub CR1         : u32,          // Control register 1              Address offset: 0x00
     pub CR2         : u32,          // Control register 2              Address offset: 0x04
     pub SMCR        : u32,          // Slave mode control register     Address offset: 0x08
@@ -360,7 +335,7 @@ pub struct TIM_9_12_Reg_Def {
 }
 
 #[repr(C)]
-pub struct TIM_10_14_Reg_Def {
+pub struct TIM_10_14_RegDef {
     pub CR1         : u32,          // Control register 1              Address offset: 0x00
     pub RESERVED0   : [u32; 2],     // Reserved                   Address offset: 0x04-0x08
     pub DIER        : u32,          // DMA/Interrupt enable register   Address offset: 0x0C
@@ -377,7 +352,7 @@ pub struct TIM_10_14_Reg_Def {
 }
 
 #[repr(C)]
-pub struct TIM_11_Reg_Def {
+pub struct TIM_11_RegDef {
     pub CR1         : u32,          // Control register 1              Address offset: 0x00
     pub RESERVED0   : [u32; 2],     // Reserved                   Address offset: 0x04-0x08
     pub DIER        : u32,          // DMA/Interrupt enable register   Address offset: 0x0C
@@ -395,7 +370,7 @@ pub struct TIM_11_Reg_Def {
 }
 
 #[repr(C)]
-pub struct RTC_RegDef {
+pub struct RTCRegDef {
     pub TR          : u32,          // Time register                   Address offset: 0x00
     pub DR          : u32,          // Date register                   Address offset: 0x04
     pub CR          : u32,          // Control register                Address offset: 0x08
@@ -439,14 +414,14 @@ pub struct RTC_RegDef {
 }
 
 #[repr(C)]
-pub struct WWDG_RegDef {
+pub struct WWDGRegDef {
     pub CR          : u32,          // Control register                Address offset: 0x00
     pub CFR         : u32,          // Configuration register          Address offset: 0x04
     pub SR          : u32,          // Status register                 Address offset: 0x08
 }
 
 #[repr(C)]
-pub struct IWDG_RegDef {
+pub struct IWDGRegDef {
     pub KR          : u32,          // Key register                    Address offset: 0x00
     pub PR          : u32,          // Prescaler register              Address offset: 0x04
     pub RLR         : u32,          // Reload register                 Address offset: 0x08
@@ -454,7 +429,7 @@ pub struct IWDG_RegDef {
 }
 
 #[repr(C)]
-pub struct SPI_RegDef {
+pub struct SPIRegDef {
     pub CR1         : u32,          // Control register 1              Address offset: 0x00
     pub CR2         : u32,          // Control register 2              Address offset: 0x04
     pub SR          : u32,          // Status register                 Address offset: 0x08
@@ -467,7 +442,7 @@ pub struct SPI_RegDef {
 }
 
 #[repr(C)]
-pub struct USART_RegDef {
+pub struct USARTRegDef {
 pub SR          : u32,              // Status register                 Address offset: 0x00
     pub DR          : u32,          // Data register                   Address offset: 0x04
     pub BRR         : u32,          // Baud rate register              Address offset: 0x08
@@ -478,7 +453,7 @@ pub SR          : u32,              // Status register                 Address o
 }
 
 #[repr(C)]
-pub struct I2C_RegDef {
+pub struct I2CRegDef {
     pub CR1         : u32,          // Control register 1              Address offset: 0x00
     pub CR2         : u32,          // Control register 2              Address offset: 0x04
     pub OAR1        : u32,          // Own address register 1          Address offset: 0x08
@@ -492,7 +467,7 @@ pub struct I2C_RegDef {
 }
 
 #[repr(C)]
-pub struct CAN_RegDef {
+pub struct CANRegDef {
     pub MCR         : u32,       // CAN master control register           Address offset: 0x00
     pub MSR         : u32,       // CAN master status register            Address offset: 0x04
     pub TSR         : u32,       // CAN transmit status register          Address offset: 0x08
@@ -588,13 +563,13 @@ pub struct CAN_RegDef {
 }
 
 #[repr(C)]
-pub struct PWR_RegDef {
+pub struct PWRRegDef {
     pub CR          : u32,        // Power control register          Address offset: 0x00
     pub CSR         : u32,        // Power control/status register   Address offset: 0x04
 }
 
 #[repr(C)]
-pub struct DAC_RegDef {
+pub struct DACRegDef {
     pub CR          : u32,      // Control register                Address offset: 0x00
     pub SWTRIGR     : u32,      // Software trigger register       Address offset: 0x04
     pub DHR12R1     : u32,      // Channel1 12-bit right-aligned data holding register Address offset: 0x08
@@ -612,7 +587,7 @@ pub struct DAC_RegDef {
 }
 
 #[repr(C)]
-pub struct ADC_RegDef {
+pub struct ADCRegDef {
     pub SR          : u32,      // Status register                 Address offset: 0x00
     pub CR1         : u32,      // Control register 1              Address offset: 0x04
     pub CR2         : u32,      // Control register 2              Address offset: 0x08
@@ -636,14 +611,14 @@ pub struct ADC_RegDef {
 }
 
 #[repr(C)]
-pub struct ADC_Common_RegDef {
+pub struct ADCCommonRegDef {
     pub CSR         : u32,       // Common status register          Address offset: 0x00
     pub CCR         : u32,       // Common control register         Address offset: 0x04
     pub CDR         : u32,       // Common regular data register for dual and triple modes Address offset: 0x08
 }
 
 #[repr(C)]
-pub struct SDIO_RegDef {
+pub struct SDIORegDef {
     pub POWER       : u32,        // Power control register         Address offset: 0x00
     pub CLKCR       : u32,        // Clock control register         Address offset: 0x04
     pub ARG         : u32,        // Argument register              Address offset: 0x08
@@ -667,7 +642,7 @@ pub struct SDIO_RegDef {
 }
 
 #[repr(C)]
-pub struct SYSCFG_RegDef {
+pub struct SYSCFGRegDef {
     pub MEMRMP      : u32,         // Memory remap register                     Address offset: 0x00
     pub PMC         : u32,         // Peripheral mode configuration register    Address offset: 0x04
     pub EXTICR      : [u32; 4],    // External interrupt configuration registers Address offset: 0x08-0x14
@@ -676,7 +651,7 @@ pub struct SYSCFG_RegDef {
 }
 
 #[repr(C)]
-pub struct EXTI_RegDef {
+pub struct EXTIRegDef {
     pub IMR         : u32,         // Interrupt mask register            Address offset: 0x00
     pub EMR         : u32,         // Event mask register                Address offset: 0x04
     pub RTSR        : u32,         // Rising trigger selection register  Address offset: 0x08
@@ -686,7 +661,7 @@ pub struct EXTI_RegDef {
 }
 
 #[repr(C)]
-pub struct FLASH_RegDef {
+pub struct FLASHRegDef {
     pub ACR         : u32,         // Access control register           Address offset: 0x00
     pub KEYR        : u32,         // Key register                      Address offset: 0x04
     pub OPTKEYR     : u32,         // Option key register               Address offset: 0x08
@@ -697,7 +672,7 @@ pub struct FLASH_RegDef {
 }
 
 #[repr(C)]
-pub struct GPIO_RegDef {
+pub struct GPIORegDef {
     pub MODER       : u32,         // Port mode register               Address offset: 0x00
     pub OTYPER      : u32,         // Port output type register        Address offset: 0x04
     pub OSPEEDR     : u32,         // Port output speed register       Address offset: 0x08
@@ -710,7 +685,7 @@ pub struct GPIO_RegDef {
 }
 
 #[repr(C)]
-pub struct RCC_RegDef {
+pub struct RCCRegDef {
     pub CR          : u32,         // Clock control register                      Address offset: 0x00
     pub PLLCFGR     : u32,         // PLL configuration register                  Address offset: 0x04
     pub CFGR        : u32,         // Clock configuration register                Address offset: 0x08
@@ -744,7 +719,7 @@ pub struct RCC_RegDef {
 }
 
 #[repr(C)]
-pub struct DMA_Stream_RegDef {
+pub struct DMAStreamRegDef {
     pub CR          : u32,         // Configuration register           Address offset: 0x00
     pub NDTR        : u32,         // Number of data register          Address offset: 0x04
     pub PAR         : u32,         // Peripheral address register      Address offset: 0x08
@@ -754,7 +729,7 @@ pub struct DMA_Stream_RegDef {
 }
 
 #[repr(C)]
-pub struct DMA_RegDef {
+pub struct DMARegDef {
     pub LISR        : u32,         // Low interrupt status register     Address offset: 0x00
     pub HISR        : u32,         // High interrupt status register    Address offset: 0x04
     pub LIFCR       : u32,         // Low interrupt flag clear register Address offset: 0x08
@@ -762,17 +737,17 @@ pub struct DMA_RegDef {
 }
 
 #[repr(C)]
-pub struct FSMC_Bank1_RegDef {
+pub struct FSMCBank1RegDef {
     pub BTCR        : [u32; 8],    // NOR/PSRAM chip-select control register(BCR) and chip-select timing register(BTR)
 }
 
 #[repr(C)]
-pub struct FSMC_Bank1E_RegDef {
+pub struct FSMCBank1ERegDef {
     pub BWTR        : [u32; 7],    // NOR/PSRAM write timing registers
 }
 
 #[repr(C)]
-pub struct FSMC_Bank2_3_RegDef {
+pub struct FSMCBank2_3RegDef {
     pub PCR2        : u32,         // NAND Flash control register 2                        Address offset: 0x60
     pub SR2         : u32,         // NAND Flash FIFO status and interrupt register 2      Address offset: 0x64
     pub PMEM2       : u32,         // NAND Flash Common memory space timing register 2     Address offset: 0x68
@@ -789,7 +764,7 @@ pub struct FSMC_Bank2_3_RegDef {
 }
 
 #[repr(C)]
-pub struct FSMC_Bank4_RegDef {
+pub struct FSMCBank4RegDef {
     pub PCR4        : u32,         // PC Card control register 4                         Address offset: 0xA0
     pub SR4         : u32,         // PC Card FIFO status and interrupt register 4       Address offset: 0xA4
     pub PMEM4       : u32,         // PC Card Common memory space timing register 4      Address offset: 0xA8
@@ -798,7 +773,7 @@ pub struct FSMC_Bank4_RegDef {
 }
 
 #[repr(C)]
-pub struct DBGMCU_RegDef {
+pub struct DBGMCURegDef {
     pub IDCODE      : u32,         // MCU device ID code                 Address offset: 0x00
     pub CR          : u32,         // Debug MCU configuration register   Address offset: 0x04
     pub APB1FZ      : u32,         // Debug MCU APB1 freeze register     Address offset: 0x08
@@ -806,7 +781,7 @@ pub struct DBGMCU_RegDef {
 }
 
 #[repr(C)]
-pub struct DCMI_RegDef {
+pub struct DCMIRegDef {
     pub CR          : u32,         // Control register 1                  Address offset: 0x00
     pub SR          : u32,         // Status register                     Address offset: 0x04
     pub RISR        : u32,         // Raw interrupt status register       Address offset: 0x08
@@ -821,7 +796,7 @@ pub struct DCMI_RegDef {
 }
 
 #[repr(C)]
-pub struct USB_OTG_Global_RegDef {
+pub struct USBOTGGlobalRegDef {
     pub GOTGCTL     : u32,         // Control and status register         Address offset: 0x000
     pub GOTGINT     : u32,         // Interrupt register                  Address offset: 0x004
     pub GAHBCFG     : u32,         // AHB configuration register          Address offset: 0x008
@@ -843,7 +818,7 @@ pub struct USB_OTG_Global_RegDef {
 }
 
 #[repr(C)]
-pub struct USB_OTG_Device_RegDef {
+pub struct USBOTGDeviceRegDef {
     pub DCFG        : u32,         // Device configuration register       Address offset: 0x800
     pub DCTL        : u32,         // Device control register             Address offset: 0x804
     pub DSTS        : u32,         // Device status register              Address offset: 0x808
@@ -867,7 +842,7 @@ pub struct USB_OTG_Device_RegDef {
 }
 
 #[repr(C)]
-pub struct USB_OTG_INEndpoint_RegDef {
+pub struct USB_OTG_INEndpointRegDef {
     pub DIEPCTL     : u32,         // Device IN endpoint control register Address offset: 0x900 + (ep_num * 0x20)
     pub RESERVED0   : u32,         // Reserved                            Address offset: 0x904 + (ep_num * 0x20)
     pub DIEPINT     : u32,         // Device IN endpoint interrupt reg.   Address offset: 0x908 + (ep_num * 0x20)
@@ -879,7 +854,7 @@ pub struct USB_OTG_INEndpoint_RegDef {
 }
 
 #[repr(C)]
-pub struct USB_OTG_OUTEndpoint_RegDef {
+pub struct USB_OTG_OUTEndpointRegDef {
     pub DOEPCTL     : u32,         // Device OUT endpoint control reg.    Address offset: 0xB00 + (ep_num * 0x20)
     pub RESERVED0   : u32,         // Reserved                            Address offset: 0xB04 + (ep_num * 0x20)
     pub DOEPINT     : u32,         // Device OUT endpoint interrupt reg.  Address offset: 0xB08 + (ep_num * 0x20)
@@ -890,7 +865,7 @@ pub struct USB_OTG_OUTEndpoint_RegDef {
 }
 
 #[repr(C)]
-pub struct USB_OTG_Host_RegDef {
+pub struct USB_OTG_HostRegDef {
     pub HCFG        : u32,         // Host configuration register         Address offset: 0x400
     pub HFIR        : u32,         // Host frame interval register        Address offset: 0x404
     pub HFNUM       : u32,         // Host frame number/frame time        Address offset: 0x408
@@ -901,7 +876,7 @@ pub struct USB_OTG_Host_RegDef {
 }
 
 #[repr(C)]
-pub struct USB_OTG_HostChannel_RegDef {
+pub struct USB_OTG_HostChannelRegDef {
     pub HCCHAR      : u32,         // Host channel characteristics        Address offset: 0x500 + (ch_num * 0x20)
     pub HCSPLT      : u32,         // Host channel split control reg.     Address offset: 0x504 + (ch_num * 0x20)
     pub HCINT       : u32,         // Host channel interrupt              Address offset: 0x508 + (ch_num * 0x20)
@@ -911,82 +886,82 @@ pub struct USB_OTG_HostChannel_RegDef {
     pub RESERVED0   : [u32; 2],    // Reserved                            Address offset: 0x518-0x51C + (ch_num * 0x20)
 }
 
-pub const GPIOA                                         : *mut GPIO_RegDef = GPIOA_BASE as *mut GPIO_RegDef;
-pub const GPIOB                                         : *mut GPIO_RegDef = GPIOB_BASE as *mut GPIO_RegDef;
-pub const GPIOC                                         : *mut GPIO_RegDef = GPIOC_BASE as *mut GPIO_RegDef;
-pub const GPIOD                                         : *mut GPIO_RegDef = GPIOD_BASE as *mut GPIO_RegDef;
-pub const GPIOE                                         : *mut GPIO_RegDef = GPIOE_BASE as *mut GPIO_RegDef;
-pub const GPIOF                                         : *mut GPIO_RegDef = GPIOF_BASE as *mut GPIO_RegDef;
-pub const GPIOG                                         : *mut GPIO_RegDef = GPIOG_BASE as *mut GPIO_RegDef;
-pub const GPIOH                                         : *mut GPIO_RegDef = GPIOH_BASE as *mut GPIO_RegDef;
-pub const GPIOI                                         : *mut GPIO_RegDef = GPIOI_BASE as *mut GPIO_RegDef;
-pub const RCC                                           : *mut RCC_RegDef = RCC_BASE as *mut RCC_RegDef;
-pub const FLASH_R                                       : *mut FLASH_RegDef = FLASH_R_BASE as *mut FLASH_RegDef;
-pub const EXTI                                          : *mut EXTI_RegDef = EXTI_BASE as *mut EXTI_RegDef;
-pub const SYSCFG                                        : *mut SYSCFG_RegDef = SYSCFG_BASE as *mut SYSCFG_RegDef;
-pub const DMA1                                          : *mut DMA_RegDef = DMA1_BASE as *mut DMA_RegDef;
-pub const DMA2                                          : *mut DMA_RegDef = DMA2_BASE as *mut DMA_RegDef;
-pub const DMA1_Stream0                                  : *mut DMA_Stream_RegDef = DMA1_Stream0_BASE as *mut DMA_Stream_RegDef;
-pub const DMA1_Stream1                                  : *mut DMA_Stream_RegDef = DMA1_Stream1_BASE as *mut DMA_Stream_RegDef;
-pub const DMA1_Stream2                                  : *mut DMA_Stream_RegDef = DMA1_Stream2_BASE as *mut DMA_Stream_RegDef;
-pub const DMA1_Stream3                                  : *mut DMA_Stream_RegDef = DMA1_Stream3_BASE as *mut DMA_Stream_RegDef;
-pub const DMA1_Stream4                                  : *mut DMA_Stream_RegDef = DMA1_Stream4_BASE as *mut DMA_Stream_RegDef;
-pub const DMA1_Stream5                                  : *mut DMA_Stream_RegDef = DMA1_Stream5_BASE as *mut DMA_Stream_RegDef;
-pub const DMA1_Stream6                                  : *mut DMA_Stream_RegDef = DMA1_Stream6_BASE as *mut DMA_Stream_RegDef;
-pub const DMA1_Stream7                                  : *mut DMA_Stream_RegDef = DMA1_Stream7_BASE as *mut DMA_Stream_RegDef;
-pub const DMA2_Stream0                                  : *mut DMA_Stream_RegDef = DMA2_Stream0_BASE as *mut DMA_Stream_RegDef;
-pub const DMA2_Stream1                                  : *mut DMA_Stream_RegDef = DMA2_Stream1_BASE as *mut DMA_Stream_RegDef;
-pub const DMA2_Stream2                                  : *mut DMA_Stream_RegDef = DMA2_Stream2_BASE as *mut DMA_Stream_RegDef;
-pub const DMA2_Stream3                                  : *mut DMA_Stream_RegDef = DMA2_Stream3_BASE as *mut DMA_Stream_RegDef;
-pub const DMA2_Stream4                                  : *mut DMA_Stream_RegDef = DMA2_Stream4_BASE as *mut DMA_Stream_RegDef;
-pub const DMA2_Stream5                                  : *mut DMA_Stream_RegDef = DMA2_Stream5_BASE as *mut DMA_Stream_RegDef;
-pub const DMA2_Stream6                                  : *mut DMA_Stream_RegDef = DMA2_Stream6_BASE as *mut DMA_Stream_RegDef;
-pub const DMA2_Stream7                                  : *mut DMA_Stream_RegDef = DMA2_Stream7_BASE as *mut DMA_Stream_RegDef;
-pub const SDIO                                          : *mut SDIO_RegDef = SDIO_BASE as *mut SDIO_RegDef;
-pub const FSMC_Bank1                                    : *mut FSMC_Bank1_RegDef = FSMC_Bank1_R_BASE as *mut FSMC_Bank1_RegDef;
-pub const FSMC_Bank1E                                   : *mut FSMC_Bank1E_RegDef = FSMC_Bank1E_R_BASE as *mut FSMC_Bank1E_RegDef;
-pub const FSMC_Bank2_3                                  : *mut FSMC_Bank2_3_RegDef = FSMC_Bank2_3_R_BASE as *mut FSMC_Bank2_3_RegDef;
-pub const FSMC_Bank4                                    : *mut FSMC_Bank4_RegDef = FSMC_Bank4_R_BASE as *mut FSMC_Bank4_RegDef;
-pub const DCMI                                          : *mut DCMI_RegDef = DCMI_BASE as *mut DCMI_RegDef;
-pub const DBGMCU                                        : *mut DBGMCU_RegDef = DBGMCU_BASE as *mut DBGMCU_RegDef;
-pub const USB_OTG_FS_GLOBAL                             : *mut USB_OTG_Global_RegDef = (USB_OTG_FS_PERIPH_BASE + USB_OTG_GLOBAL_BASE) as *mut USB_OTG_Global_RegDef;
-pub const USB_OTG_HS_GLOBAL                             : *mut USB_OTG_Global_RegDef = (USB_OTG_HS_PERIPH_BASE + USB_OTG_GLOBAL_BASE) as *mut USB_OTG_Global_RegDef;
-pub const USB_OTG_FS_DEVICE                             : *mut USB_OTG_Device_RegDef = (USB_OTG_FS_PERIPH_BASE + USB_OTG_DEVICE_BASE) as *mut USB_OTG_Device_RegDef;
-pub const USB_OTG_HS_DEVICE                             : *mut USB_OTG_Device_RegDef = (USB_OTG_HS_PERIPH_BASE + USB_OTG_DEVICE_BASE) as *mut USB_OTG_Device_RegDef;
-pub const USB_OTG_FS_HOST                               : *mut USB_OTG_Host_RegDef = (USB_OTG_FS_PERIPH_BASE + USB_OTG_HOST_BASE) as *mut USB_OTG_Host_RegDef;
-pub const USB_OTG_HS_HOST                               : *mut USB_OTG_Host_RegDef = (USB_OTG_HS_PERIPH_BASE + USB_OTG_HOST_BASE) as *mut USB_OTG_Host_RegDef;
-pub const TIM6                                          : *mut TIM_6_7_Reg_Def = TIM6_BASE as *mut TIM_6_7_Reg_Def;
-pub const TIM7                                          : *mut TIM_6_7_Reg_Def = TIM7_BASE as *mut TIM_6_7_Reg_Def;
-pub const TIM8                                          : *mut TIM_1_8_Reg_Def = TIM8_BASE as *mut TIM_1_8_Reg_Def;
-pub const TIM9                                          : *mut TIM_9_12_Reg_Def = TIM9_BASE as *mut TIM_9_12_Reg_Def;
-pub const TIM10                                         : *mut TIM_10_14_Reg_Def = TIM10_BASE as *mut TIM_10_14_Reg_Def;
-pub const TIM11                                         : *mut TIM_11_Reg_Def = TIM11_BASE as *mut TIM_11_Reg_Def;
-pub const TIM12                                         : *mut TIM_9_12_Reg_Def = TIM12_BASE as *mut TIM_9_12_Reg_Def;
-pub const TIM13                                         : *mut TIM_10_14_Reg_Def = TIM13_BASE as *mut TIM_10_14_Reg_Def;
-pub const TIM14                                         : *mut TIM_10_14_Reg_Def = TIM14_BASE as *mut TIM_10_14_Reg_Def;
-pub const RTC                                           : *mut RTC_RegDef = RTC_BASE as *mut RTC_RegDef;
-pub const WWDG                                          : *mut WWDG_RegDef = WWDG_BASE as *mut WWDG_RegDef;
-pub const IWDG                                          : *mut IWDG_RegDef = IWDG_BASE as *mut IWDG_RegDef;
-pub const SPI1                                          : *mut SPI_RegDef = SPI1_BASE as *mut SPI_RegDef;
-pub const SPI2                                          : *mut SPI_RegDef = SPI2_BASE as *mut SPI_RegDef;
-pub const SPI3                                          : *mut SPI_RegDef = SPI3_BASE as *mut SPI_RegDef;
-pub const I2S2ext                                       : *mut SPI_RegDef = I2S2ext_BASE as *mut SPI_RegDef;
-pub const I2S3ext                                       : *mut SPI_RegDef = I2S3ext_BASE as *mut SPI_RegDef;
-pub const USART1                                        : *mut USART_RegDef = USART1_BASE as *mut USART_RegDef;
-pub const USART2                                        : *mut USART_RegDef = USART2_BASE as *mut USART_RegDef;
-pub const USART3                                        : *mut USART_RegDef = USART3_BASE as *mut USART_RegDef;
-pub const UART4                                         : *mut USART_RegDef = UART4_BASE as *mut USART_RegDef;
-pub const UART5                                         : *mut USART_RegDef = UART5_BASE as *mut USART_RegDef;
-pub const USART6                                        : *mut USART_RegDef = USART6_BASE as *mut USART_RegDef;
-pub const I2C1                                          : *mut I2C_RegDef = I2C1_BASE as *mut I2C_RegDef;
-pub const I2C2                                          : *mut I2C_RegDef = I2C2_BASE as *mut I2C_RegDef;
-pub const I2C3                                          : *mut I2C_RegDef = I2C3_BASE as *mut I2C_RegDef;
-pub const CAN1                                          : *mut CAN_RegDef = CAN1_BASE as *mut CAN_RegDef;
-pub const CAN2                                          : *mut CAN_RegDef = CAN2_BASE as *mut CAN_RegDef;
-pub const PWR                                           : *mut PWR_RegDef = PWR_BASE as *mut PWR_RegDef;
-pub const DAC                                           : *mut DAC_RegDef = DAC_BASE as *mut DAC_RegDef;
-pub const ADC1                                          : *mut ADC_RegDef = ADC1_BASE as *mut ADC_RegDef;
-pub const ADC2                                          : *mut ADC_RegDef = ADC2_BASE as *mut ADC_RegDef;
-pub const ADC3                                          : *mut ADC_RegDef = ADC3_BASE as *mut ADC_RegDef;
-pub const ADC123_COMMON                                 : *mut ADC_Common_RegDef = ADC123_COMMON_BASE as *mut ADC_Common_RegDef;
+pub const GPIOA                                         : *mut GPIORegDef = GPIOA_BASE as *mut GPIORegDef;
+pub const GPIOB                                         : *mut GPIORegDef = GPIOB_BASE as *mut GPIORegDef;
+pub const GPIOC                                         : *mut GPIORegDef = GPIOC_BASE as *mut GPIORegDef;
+pub const GPIOD                                         : *mut GPIORegDef = GPIOD_BASE as *mut GPIORegDef;
+pub const GPIOE                                         : *mut GPIORegDef = GPIOE_BASE as *mut GPIORegDef;
+pub const GPIOF                                         : *mut GPIORegDef = GPIOF_BASE as *mut GPIORegDef;
+pub const GPIOG                                         : *mut GPIORegDef = GPIOG_BASE as *mut GPIORegDef;
+pub const GPIOH                                         : *mut GPIORegDef = GPIOH_BASE as *mut GPIORegDef;
+pub const GPIOI                                         : *mut GPIORegDef = GPIOI_BASE as *mut GPIORegDef;
+pub const RCC                                           : *mut RCCRegDef = RCC_BASE as *mut RCCRegDef;
+pub const FLASH_R                                       : *mut FLASHRegDef = FLASH_R_BASE as *mut FLASHRegDef;
+pub const EXTI                                          : *mut EXTIRegDef = EXTI_BASE as *mut EXTIRegDef;
+pub const SYSCFG                                        : *mut SYSCFGRegDef = SYSCFG_BASE as *mut SYSCFGRegDef;
+pub const DMA1                                          : *mut DMARegDef = DMA1_BASE as *mut DMARegDef;
+pub const DMA2                                          : *mut DMARegDef = DMA2_BASE as *mut DMARegDef;
+pub const DMA1_Stream0                                  : *mut DMAStreamRegDef = DMA1_Stream0_BASE as *mut DMAStreamRegDef;
+pub const DMA1_Stream1                                  : *mut DMAStreamRegDef = DMA1_Stream1_BASE as *mut DMAStreamRegDef;
+pub const DMA1_Stream2                                  : *mut DMAStreamRegDef = DMA1_Stream2_BASE as *mut DMAStreamRegDef;
+pub const DMA1_Stream3                                  : *mut DMAStreamRegDef = DMA1_Stream3_BASE as *mut DMAStreamRegDef;
+pub const DMA1_Stream4                                  : *mut DMAStreamRegDef = DMA1_Stream4_BASE as *mut DMAStreamRegDef;
+pub const DMA1_Stream5                                  : *mut DMAStreamRegDef = DMA1_Stream5_BASE as *mut DMAStreamRegDef;
+pub const DMA1_Stream6                                  : *mut DMAStreamRegDef = DMA1_Stream6_BASE as *mut DMAStreamRegDef;
+pub const DMA1_Stream7                                  : *mut DMAStreamRegDef = DMA1_Stream7_BASE as *mut DMAStreamRegDef;
+pub const DMA2_Stream0                                  : *mut DMAStreamRegDef = DMA2_Stream0_BASE as *mut DMAStreamRegDef;
+pub const DMA2_Stream1                                  : *mut DMAStreamRegDef = DMA2_Stream1_BASE as *mut DMAStreamRegDef;
+pub const DMA2_Stream2                                  : *mut DMAStreamRegDef = DMA2_Stream2_BASE as *mut DMAStreamRegDef;
+pub const DMA2_Stream3                                  : *mut DMAStreamRegDef = DMA2_Stream3_BASE as *mut DMAStreamRegDef;
+pub const DMA2_Stream4                                  : *mut DMAStreamRegDef = DMA2_Stream4_BASE as *mut DMAStreamRegDef;
+pub const DMA2_Stream5                                  : *mut DMAStreamRegDef = DMA2_Stream5_BASE as *mut DMAStreamRegDef;
+pub const DMA2_Stream6                                  : *mut DMAStreamRegDef = DMA2_Stream6_BASE as *mut DMAStreamRegDef;
+pub const DMA2_Stream7                                  : *mut DMAStreamRegDef = DMA2_Stream7_BASE as *mut DMAStreamRegDef;
+pub const SDIO                                          : *mut SDIORegDef = SDIO_BASE as *mut SDIORegDef;
+pub const FSMCBank1                                     : *mut FSMCBank1RegDef = FSMCBank1_R_BASE as *mut FSMCBank1RegDef;
+pub const FSMCBank1E                                    : *mut FSMCBank1ERegDef = FSMCBank1E_R_BASE as *mut FSMCBank1ERegDef;
+pub const FSMCBank2_3                                   : *mut FSMCBank2_3RegDef = FSMCBank2_3_R_BASE as *mut FSMCBank2_3RegDef;
+pub const FSMCBank4                                     : *mut FSMCBank4RegDef = FSMCBank4_R_BASE as *mut FSMCBank4RegDef;
+pub const DCMI                                          : *mut DCMIRegDef = DCMI_BASE as *mut DCMIRegDef;
+pub const DBGMCU                                        : *mut DBGMCURegDef = DBGMCU_BASE as *mut DBGMCURegDef;
+pub const USB_OTG_FS_GLOBAL                             : *mut USBOTGGlobalRegDef = (USB_OTG_FS_PERIPH_BASE + USB_OTG_GLOBAL_BASE) as *mut USBOTGGlobalRegDef;
+pub const USB_OTG_HS_GLOBAL                             : *mut USBOTGGlobalRegDef = (USB_OTG_HS_PERIPH_BASE + USB_OTG_GLOBAL_BASE) as *mut USBOTGGlobalRegDef;
+pub const USB_OTG_FS_DEVICE                             : *mut USBOTGDeviceRegDef = (USB_OTG_FS_PERIPH_BASE + USB_OTG_DEVICE_BASE) as *mut USBOTGDeviceRegDef;
+pub const USB_OTG_HS_DEVICE                             : *mut USBOTGDeviceRegDef = (USB_OTG_HS_PERIPH_BASE + USB_OTG_DEVICE_BASE) as *mut USBOTGDeviceRegDef;
+pub const USB_OTG_FS_HOST                               : *mut USB_OTG_HostRegDef = (USB_OTG_FS_PERIPH_BASE + USB_OTG_HOST_BASE) as *mut USB_OTG_HostRegDef;
+pub const USB_OTG_HS_HOST                               : *mut USB_OTG_HostRegDef = (USB_OTG_HS_PERIPH_BASE + USB_OTG_HOST_BASE) as *mut USB_OTG_HostRegDef;
+pub const TIM6                                          : *mut TIM_6_7_RegDef = TIM6_BASE as *mut TIM_6_7_RegDef;
+pub const TIM7                                          : *mut TIM_6_7_RegDef = TIM7_BASE as *mut TIM_6_7_RegDef;
+pub const TIM8                                          : *mut TIM_1_8_RegDef = TIM8_BASE as *mut TIM_1_8_RegDef;
+pub const TIM9                                          : *mut TIM_9_12_RegDef = TIM9_BASE as *mut TIM_9_12_RegDef;
+pub const TIM10                                         : *mut TIM_10_14_RegDef = TIM10_BASE as *mut TIM_10_14_RegDef;
+pub const TIM11                                         : *mut TIM_11_RegDef = TIM11_BASE as *mut TIM_11_RegDef;
+pub const TIM12                                         : *mut TIM_9_12_RegDef = TIM12_BASE as *mut TIM_9_12_RegDef;
+pub const TIM13                                         : *mut TIM_10_14_RegDef = TIM13_BASE as *mut TIM_10_14_RegDef;
+pub const TIM14                                         : *mut TIM_10_14_RegDef = TIM14_BASE as *mut TIM_10_14_RegDef;
+pub const RTC                                           : *mut RTCRegDef = RTC_BASE as *mut RTCRegDef;
+pub const WWDG                                          : *mut WWDGRegDef = WWDG_BASE as *mut WWDGRegDef;
+pub const IWDG                                          : *mut IWDGRegDef = IWDG_BASE as *mut IWDGRegDef;
+pub const SPI1                                          : *mut SPIRegDef = SPI1_BASE as *mut SPIRegDef;
+pub const SPI2                                          : *mut SPIRegDef = SPI2_BASE as *mut SPIRegDef;
+pub const SPI3                                          : *mut SPIRegDef = SPI3_BASE as *mut SPIRegDef;
+pub const I2S2ext                                       : *mut SPIRegDef = I2S2ext_BASE as *mut SPIRegDef;
+pub const I2S3ext                                       : *mut SPIRegDef = I2S3ext_BASE as *mut SPIRegDef;
+pub const USART1                                        : *mut USARTRegDef = USART1_BASE as *mut USARTRegDef;
+pub const USART2                                        : *mut USARTRegDef = USART2_BASE as *mut USARTRegDef;
+pub const USART3                                        : *mut USARTRegDef = USART3_BASE as *mut USARTRegDef;
+pub const UART4                                         : *mut USARTRegDef = UART4_BASE as *mut USARTRegDef;
+pub const UART5                                         : *mut USARTRegDef = UART5_BASE as *mut USARTRegDef;
+pub const USART6                                        : *mut USARTRegDef = USART6_BASE as *mut USARTRegDef;
+pub const I2C1                                          : *mut I2CRegDef = I2C1_BASE as *mut I2CRegDef;
+pub const I2C2                                          : *mut I2CRegDef = I2C2_BASE as *mut I2CRegDef;
+pub const I2C3                                          : *mut I2CRegDef = I2C3_BASE as *mut I2CRegDef;
+pub const CAN1                                          : *mut CANRegDef = CAN1_BASE as *mut CANRegDef;
+pub const CAN2                                          : *mut CANRegDef = CAN2_BASE as *mut CANRegDef;
+pub const PWR                                           : *mut PWRRegDef = PWR_BASE as *mut PWRRegDef;
+pub const DAC                                           : *mut DACRegDef = DAC_BASE as *mut DACRegDef;
+pub const ADC1                                          : *mut ADCRegDef = ADC1_BASE as *mut ADCRegDef;
+pub const ADC2                                          : *mut ADCRegDef = ADC2_BASE as *mut ADCRegDef;
+pub const ADC3                                          : *mut ADCRegDef = ADC3_BASE as *mut ADCRegDef;
+pub const ADC123_COMMON                                 : *mut ADCCommonRegDef = ADC123_COMMON_BASE as *mut ADCCommonRegDef;
 
