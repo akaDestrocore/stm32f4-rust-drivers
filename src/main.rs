@@ -6,6 +6,10 @@ use cortex_m_rt::entry;
 use stm32f4_rust_drivers::{
     stm32f4xx::{TIM6, RCC},
     stm32f4_rcc::init_max_performance_clocks,
+    stm32f4_gpio::{
+        GpioHandle, GpioPort, GpioPin, GpioMode, GpioSpeed, 
+        GpioPullUpDown, GpioOutputType, init_gpio_pin
+    },
 };
 
 #[cortex_m_rt::pre_init]
@@ -37,63 +41,58 @@ fn delay_ms(ms: u32) {
 
 #[entry]
 fn main() -> ! {
+    // Initialize system clock
     let _ = init_max_performance_clocks();
-    init_delay_timer();
-    unsafe {
-        (*RCC).AHB1ENR |= 1 << 3;
-    }
     
-    unsafe {
-        let gpiod: *mut stm32f4_rust_drivers::stm32f4xx::GPIORegDef = stm32f4_rust_drivers::stm32f4xx::GPIOD;
-        
-        // green
-        (*gpiod).MODER &= !(0x3 << (12 * 2)); // reset bits
-        (*gpiod).MODER |= 0x1 << (12 * 2);    // output
-        
-        // orange
-        (*gpiod).MODER &= !(0x3 << (13 * 2));
-        (*gpiod).MODER |= 0x1 << (13 * 2);
-        
-        // Pred
-        (*gpiod).MODER &= !(0x3 << (14 * 2));
-        (*gpiod).MODER |= 0x1 << (14 * 2);
-        
-        // blue
-        (*gpiod).MODER &= !(0x3 << (15 * 2));
-        (*gpiod).MODER |= 0x1 << (15 * 2);
-        
-        // high speed
-        (*gpiod).OSPEEDR |= 0x3 << (12 * 2);
-        (*gpiod).OSPEEDR |= 0x3 << (13 * 2);
-        (*gpiod).OSPEEDR |= 0x3 << (14 * 2);
-        (*gpiod).OSPEEDR |= 0x3 << (15 * 2);
-        
-        (*gpiod).OTYPER &= !(0x1 << 12);
-        (*gpiod).OTYPER &= !(0x1 << 13);
-        (*gpiod).OTYPER &= !(0x1 << 14);
-        (*gpiod).OTYPER &= !(0x1 << 15);
-        
-        (*gpiod).PUPDR &= !(0x3 << (12 * 2));
-        (*gpiod).PUPDR &= !(0x3 << (13 * 2));
-        (*gpiod).PUPDR &= !(0x3 << (14 * 2));
-        (*gpiod).PUPDR &= !(0x3 << (15 * 2));
-    }
+    // Initialize delay timer
+    init_delay_timer();
+    
+    // Initialize GPIO pins for LEDs
+    let green_led: GpioHandle<'_> = init_gpio_pin(
+        GpioPort::GpioD,
+        GpioPin::Pin12,
+        GpioMode::Output,
+        GpioSpeed::VeryHigh,
+        GpioPullUpDown::NoPull,
+        GpioOutputType::PushPull
+    ).unwrap();
+    
+    let orange_led: GpioHandle<'_> = init_gpio_pin(
+        GpioPort::GpioD,
+        GpioPin::Pin13,
+        GpioMode::Output,
+        GpioSpeed::VeryHigh,
+        GpioPullUpDown::NoPull,
+        GpioOutputType::PushPull
+    ).unwrap();
+    
+    let red_led: GpioHandle<'_> = init_gpio_pin(
+        GpioPort::GpioD,
+        GpioPin::Pin14,
+        GpioMode::Output,
+        GpioSpeed::VeryHigh,
+        GpioPullUpDown::NoPull,
+        GpioOutputType::PushPull
+    ).unwrap();
+    
+    let blue_led: GpioHandle<'_> = init_gpio_pin(
+        GpioPort::GpioD,
+        GpioPin::Pin15,
+        GpioMode::Output,
+        GpioSpeed::VeryHigh,
+        GpioPullUpDown::NoPull,
+        GpioOutputType::PushPull
+    ).unwrap();
     
     // infinite loop
     loop {
-        unsafe {
-            let gpiod: *mut stm32f4_rust_drivers::stm32f4xx::GPIORegDef = stm32f4_rust_drivers::stm32f4xx::GPIOD;
-            
-            // enable all LEDs
-            (*gpiod).BSRR = (1 << 12) | (1 << 13) | (1 << 14) | (1 << 15);
-            
-            delay_ms(2000);
-            
-            // disable all LEDs
-            (*gpiod).BSRR = (1 << (12 + 16)) | (1 << (13 + 16)) | (1 << (14 + 16)) | (1 << (15 + 16));
-            
-            delay_ms(2000);
-        }
+        // turn on all LEDs
+        green_led.toggle();
+        orange_led.toggle();
+        red_led.toggle();
+        blue_led.toggle();
+        
+        delay_ms(2000);
     }
 }
 
