@@ -107,12 +107,46 @@ pub enum GPIO_Pin {
     GPIO_PIN_15 = 15,
 }
 
+<<<<<<< HEAD
 pub struct GPIO_PinConfig {
     pub pin_number: GPIO_Pin,
     pub mode: GPIO_Mode,
     pub speed: GPIO_Speed,
     pub pupd: GPIO_PuPd,
     pub output_type: GPIO_OutputType,
+=======
+#[derive(Copy, Clone)]
+struct RegValue(u32);
+
+impl RegValue {
+    fn new(value: u32) -> Self {
+        RegValue(value)
+    }
+    
+    fn get(&self) -> u32 {
+        self.0
+    }
+    
+    fn set_bits(&mut self, mask: u32) {
+        self.0 |= mask;
+    }
+    
+    fn clear_bits(&mut self, mask: u32) {
+        self.0 &= !mask;
+    }
+    
+    fn modify<F>(&mut self, f: F) where F: FnOnce(u32) -> u32 {
+        self.0 = f(self.0);
+    }
+}
+
+pub struct GpioPinConfig {
+    pub pin_number: GpioPin,
+    pub mode: GpioMode,
+    pub speed: GpioSpeed,
+    pub pull_type: GpioPullUpDown,
+    pub output_type: GpioOutputType,
+>>>>>>> 49e07da (added RCC module)
     pub alt_func: u8,
 }
 
