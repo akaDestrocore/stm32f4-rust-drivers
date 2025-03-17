@@ -4,8 +4,8 @@
 use core::panic::PanicInfo;
 use cortex_m_rt::entry;
 use stm32f4_rust_drivers::{
-    stm32f4xx::{TIM6, RCC},
-    stm32f4_rcc::init_max_performance_clocks,
+    stm32f4xx::{TIM6},
+    stm32f4_rcc::{RccRegister, init_max_performance_clocks},
     stm32f4_gpio::{
         GpioHandle, GpioPort, GpioPin, GpioMode, GpioSpeed, 
         GpioPullUpDown, GpioOutputType, init_gpio_pin
@@ -19,9 +19,18 @@ unsafe fn __pre_init() {
 
 // TIM6 init
 fn init_delay_timer() {
+    let rcc_reg: RccRegister = match RccRegister::new() {
+        Ok(reg) => reg,
+        Err(_) => return,
+    };
+    
+    // Enable TIM6
+    let _ = rcc_reg.modify_apb1enr(|mut reg: stm32f4_rust_drivers::stm32f4_rcc::RegValue| {
+        reg.set_bits(1 << 4);
+        reg
+    });
+    
     unsafe {
-        (*RCC).APB1ENR |= 1 << 4;
-        
         (*TIM6).PSC = 42000 - 1; // 42 MHz / 42000 = 1 kHz (1 ms period)
     }
 }

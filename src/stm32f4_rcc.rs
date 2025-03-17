@@ -1,7 +1,7 @@
 use core::marker::PhantomData;
-use crate::stm32f4xx::{RCC, FLASH_R, RCCRegDef};
+use crate::stm32f4xx::{RCC, FLASH_R, RCCRegDef, FLASHRegDef};
 
-// Error type for GPIO operations
+// Error type for RCC
 #[derive(Debug, Clone, Copy)]
 pub enum RccError {
     InvalidConfiguration,
@@ -25,15 +25,11 @@ pub enum OscillatorType {
     LSI = 8,
 }
 
-
 impl core::ops::BitOr for OscillatorType {
-
     type Output = u32;
 
     fn bitor(self, rhs: Self) -> Self::Output {
-
         self as u32 | rhs as u32
-
     }
 }
 
@@ -160,10 +156,10 @@ impl Default for PllConfig {
         PllConfig {
             state: PllState::None,
             source: PllSource::Hsi,
-            m: 16,
-            n: 336,
-            p: PllP::Div4,
-            q: 7,
+            m: 4,
+            n: 168,
+            p: PllP::Div2,
+            q: 4,
         }
     }
 }
@@ -222,193 +218,460 @@ const HSE_VALUE: u32 = 8_000_000;
 const AHB_PRESCALER: [u16; 8] = [2, 4, 8, 16, 64, 128, 256, 512];
 const APB_PRESCALER: [u16; 4] = [2, 4, 8, 16];
 
+// Helper struct for register value operations
+#[derive(Copy, Clone)]
+pub struct RegValue(u32);
+
+impl RegValue {
+    pub fn new(value: u32) -> Self {
+        RegValue(value)
+    }
+    
+    pub fn get(&self) -> u32 {
+        self.0
+    }
+    
+    pub fn set_bits(&mut self, mask: u32) {
+        self.0 |= mask;
+    }
+    
+    pub fn clear_bits(&mut self, mask: u32) {
+        self.0 &= !mask;
+    }
+    
+    pub fn modify<F>(&mut self, f: F) where F: FnOnce(u32) -> u32 {
+        self.0 = f(self.0);
+    }
+}
+
+// RCC register access
+pub struct RccRegister {
+    register: *mut RCCRegDef,
+}
+
+impl RccRegister {
+    pub fn new() -> Result<Self, RccError> {
+        if RCC.is_null() {
+            return Err(RccError::HardwareFault);
+        }
+        
+        Ok(RccRegister { register: RCC })
+    }
+    
+    // Read CR register
+    pub fn read_cr(&self) -> Result<RegValue, RccError> {
+        if self.register.is_null() {
+            return Err(RccError::HardwareFault);
+        }
+        
+        let value: u32 = unsafe { (*self.register).CR };
+        Ok(RegValue::new(value))
+    }
+    
+    // Write CR register
+    pub fn write_cr(&self, value: RegValue) -> Result<(), RccError> {
+        if self.register.is_null() {
+            return Err(RccError::HardwareFault);
+        }
+        
+        unsafe {
+            (*self.register).CR = value.get();
+        }
+        
+        Ok(())
+    }
+    
+    // Modify CR register
+    pub fn modify_cr<F>(&self, f: F) -> Result<(), RccError> 
+    where F: FnOnce(RegValue) -> RegValue {
+        let value: RegValue = self.read_cr()?;
+        let new_value: RegValue = f(value);
+        self.write_cr(new_value)
+    }
+    
+    // Read CFGR register
+    pub fn read_cfgr(&self) -> Result<RegValue, RccError> {
+        if self.register.is_null() {
+            return Err(RccError::HardwareFault);
+        }
+        
+        let value: u32 = unsafe { (*self.register).CFGR };
+        Ok(RegValue::new(value))
+    }
+    
+    // Write CFGR register
+    pub fn write_cfgr(&self, value: RegValue) -> Result<(), RccError> {
+        if self.register.is_null() {
+            return Err(RccError::HardwareFault);
+        }
+        
+        unsafe {
+            (*self.register).CFGR = value.get();
+        }
+        
+        Ok(())
+    }
+    
+    // Modify CFGR register
+    pub fn modify_cfgr<F>(&self, f: F) -> Result<(), RccError> 
+    where F: FnOnce(RegValue) -> RegValue {
+        let value: RegValue = self.read_cfgr()?;
+        let new_value: RegValue = f(value);
+        self.write_cfgr(new_value)
+    }
+    
+    // Read PLLCFGR register
+    pub fn read_pllcfgr(&self) -> Result<RegValue, RccError> {
+        if self.register.is_null() {
+            return Err(RccError::HardwareFault);
+        }
+        
+        let value: u32 = unsafe { (*self.register).PLLCFGR };
+        Ok(RegValue::new(value))
+    }
+    
+    // Write PLLCFGR register
+    pub fn write_pllcfgr(&self, value: RegValue) -> Result<(), RccError> {
+        if self.register.is_null() {
+            return Err(RccError::HardwareFault);
+        }
+        
+        unsafe {
+            (*self.register).PLLCFGR = value.get();
+        }
+        
+        Ok(())
+    }
+    
+    // Modify PLLCFGR register
+    pub fn modify_pllcfgr<F>(&self, f: F) -> Result<(), RccError> 
+    where F: FnOnce(RegValue) -> RegValue {
+        let value: RegValue = self.read_pllcfgr()?;
+        let new_value: RegValue = f(value);
+        self.write_pllcfgr(new_value)
+    }
+    
+    // Read BDCR register
+    pub fn read_bdcr(&self) -> Result<RegValue, RccError> {
+        if self.register.is_null() {
+            return Err(RccError::HardwareFault);
+        }
+        
+        let value: u32 = unsafe { (*self.register).BDCR };
+        Ok(RegValue::new(value))
+    }
+    
+    // Write BDCR register
+    pub fn write_bdcr(&self, value: RegValue) -> Result<(), RccError> {
+        if self.register.is_null() {
+            return Err(RccError::HardwareFault);
+        }
+        
+        unsafe {
+            (*self.register).BDCR = value.get();
+        }
+        
+        Ok(())
+    }
+    
+    // Modify BDCR register
+    pub fn modify_bdcr<F>(&self, f: F) -> Result<(), RccError> 
+    where F: FnOnce(RegValue) -> RegValue {
+        let value: RegValue = self.read_bdcr()?;
+        let new_value: RegValue = f(value);
+        self.write_bdcr(new_value)
+    }
+    
+    // Read CSR register
+    pub fn read_csr(&self) -> Result<RegValue, RccError> {
+        if self.register.is_null() {
+            return Err(RccError::HardwareFault);
+        }
+        
+        let value: u32 = unsafe { (*self.register).CSR };
+        Ok(RegValue::new(value))
+    }
+    
+    // Write CSR register
+    pub fn write_csr(&self, value: RegValue) -> Result<(), RccError> {
+        if self.register.is_null() {
+            return Err(RccError::HardwareFault);
+        }
+        
+        unsafe {
+            (*self.register).CSR = value.get();
+        }
+        
+        Ok(())
+    }
+    
+    // Modify CSR register
+    pub fn modify_csr<F>(&self, f: F) -> Result<(), RccError> 
+    where F: FnOnce(RegValue) -> RegValue {
+        let value: RegValue = self.read_csr()?;
+        let new_value: RegValue = f(value);
+        self.write_csr(new_value)
+    }
+    
+    // Read AHB1ENR register
+    pub fn read_ahb1enr(&self) -> Result<RegValue, RccError> {
+        if self.register.is_null() {
+            return Err(RccError::HardwareFault);
+        }
+        
+        let value: u32 = unsafe { (*self.register).AHB1ENR };
+        Ok(RegValue::new(value))
+    }
+    
+    // Write AHB1ENR register
+    pub fn write_ahb1enr(&self, value: RegValue) -> Result<(), RccError> {
+        if self.register.is_null() {
+            return Err(RccError::HardwareFault);
+        }
+        
+        unsafe {
+            (*self.register).AHB1ENR = value.get();
+        }
+        
+        Ok(())
+    }
+    
+    // Modify AHB1ENR register
+    pub fn modify_ahb1enr<F>(&self, f: F) -> Result<(), RccError> 
+    where F: FnOnce(RegValue) -> RegValue {
+        let value: RegValue = self.read_ahb1enr()?;
+        let new_value: RegValue = f(value);
+        self.write_ahb1enr(new_value)
+    }
+    
+    // Read APB1ENR register
+    pub fn read_apb1enr(&self) -> Result<RegValue, RccError> {
+        if self.register.is_null() {
+            return Err(RccError::HardwareFault);
+        }
+        
+        let value: u32 = unsafe { (*self.register).APB1ENR };
+        Ok(RegValue::new(value))
+    }
+    
+    // Write APB1ENR register
+    pub fn write_apb1enr(&self, value: RegValue) -> Result<(), RccError> {
+        if self.register.is_null() {
+            return Err(RccError::HardwareFault);
+        }
+        
+        unsafe {
+            (*self.register).APB1ENR = value.get();
+        }
+        
+        Ok(())
+    }
+    
+    // Modify APB1ENR register
+    pub fn modify_apb1enr<F>(&self, f: F) -> Result<(), RccError> 
+    where F: FnOnce(RegValue) -> RegValue {
+        let value: RegValue = self.read_apb1enr()?;
+        let new_value: RegValue = f(value);
+        self.write_apb1enr(new_value)
+    }
+}
+
+// FLASH register access
+struct FlashRegister {
+    register: *mut FLASHRegDef,
+}
+
+impl FlashRegister {
+    pub fn new() -> Result<Self, RccError> {
+        if FLASH_R.is_null() {
+            return Err(RccError::HardwareFault);
+        }
+        
+        Ok(FlashRegister { register: FLASH_R })
+    }
+    
+    // Read ACR register
+    pub fn read_acr(&self) -> Result<RegValue, RccError> {
+        if self.register.is_null() {
+            return Err(RccError::HardwareFault);
+        }
+        
+        let value: u32 = unsafe { (*self.register).ACR };
+        Ok(RegValue::new(value))
+    }
+    
+    // Write ACR register
+    pub fn write_acr(&self, value: RegValue) -> Result<(), RccError> {
+        if self.register.is_null() {
+            return Err(RccError::HardwareFault);
+        }
+        
+        unsafe {
+            (*self.register).ACR = value.get();
+        }
+        
+        Ok(())
+    }
+    
+    // Modify ACR register
+    pub fn modify_acr<F>(&self, f: F) -> Result<(), RccError> 
+    where F: FnOnce(RegValue) -> RegValue {
+        let value: RegValue = self.read_acr()?;
+        let new_value: RegValue = f(value);
+        self.write_acr(new_value)
+    }
+}
+
 pub struct RccHandle<'a> {
-    _prcc: *mut RCCRegDef,
+    pub rcc_reg: RccRegister,
+    flash_reg: FlashRegister,
     _marker: PhantomData<&'a ()>,
 }
 
 impl<'a> RccHandle<'a> {
-    pub fn new() -> Self {
-        RccHandle {
-            _prcc: RCC,
+    pub fn new() -> Result<Self, RccError> {
+        let rcc_reg: RccRegister = RccRegister::new()?;
+        let flash_reg: FlashRegister = FlashRegister::new()?;
+        
+        Ok(RccHandle {
+            rcc_reg,
+            flash_reg,
             _marker: PhantomData,
-        }
+        })
     }
 
     pub fn osc_config(&self, config: &OscConfig) -> Result<(), RccError> {
-        if 0 != (config.oscillator_type as u32 & OscillatorType::HSE as u32) {
+        // Configure HSE
+        if (config.oscillator_type as u32 & OscillatorType::HSE as u32) != 0 {
             match config.hse_state {
-                HseState::Bypass => unsafe {
-                    (*RCC).CR &= !(1 << 16);
-                    (*RCC).CR |= 1 << 18;
-                    (*RCC).CR |= 1 << 16;
+                HseState::Bypass => {
+                    self.rcc_reg.modify_cr(|mut reg: RegValue| {
+                        reg.clear_bits(1 << 16); // Turn off HSE first
+                        reg.set_bits(1 << 18);   // Set bypass mode
+                        reg.set_bits(1 << 16);   // Turn on HSE
+                        reg
+                    })?;
                 },
-                HseState::On => unsafe {
-                    (*RCC).CR |= 1 << 16;
+                HseState::On => {
+                    self.rcc_reg.modify_cr(|mut reg: RegValue| {
+                        reg.set_bits(1 << 16);   // Turn on HSE
+                        reg
+                    })?;
                 },
-                HseState::Off => unsafe {
-                    (*RCC).CR &= !(1 << 16);
+                HseState::Off => {
+                    self.rcc_reg.modify_cr(|mut reg: RegValue| {
+                        reg.clear_bits(1 << 16); // Turn off HSE
+                        reg
+                    })?;
                 },
             }
         }
 
+        // Configure HSI
         if (config.oscillator_type as u32 & OscillatorType::HSI as u32) != 0 {
             match config.hsi_state {
-                HsiState::On => unsafe {
-                    (*RCC).CR |= 1 << 0;
+                HsiState::On => {
+                    self.rcc_reg.modify_cr(|mut reg: RegValue| {
+                        reg.set_bits(1 << 0);    // Turn on HSI
+                        reg
+                    })?;
                 },
-                HsiState::Off => unsafe {
-                    (*RCC).CR &= !(1 << 0);
+                HsiState::Off => {
+                    self.rcc_reg.modify_cr(|mut reg: RegValue| {
+                        reg.clear_bits(1 << 0);  // Turn off HSI
+                        reg
+                    })?;
                 },
             }
         }
 
+        // Configure LSE
         if (config.oscillator_type as u32 & OscillatorType::LSE as u32) != 0 {
             match config.lse_state {
-                LseState::On => unsafe {
-                    (*RCC).BDCR |= 1 << 0;
+                LseState::On => {
+                    self.rcc_reg.modify_bdcr(|mut reg: RegValue| {
+                        reg.set_bits(1 << 0);    // Turn on LSE
+                        reg
+                    })?;
                 },
-                LseState::Off => unsafe {
-                    (*RCC).BDCR &= !(1 << 0);
+                LseState::Off => {
+                    self.rcc_reg.modify_bdcr(|mut reg: RegValue| {
+                        reg.clear_bits(1 << 0);  // Turn off LSE
+                        reg
+                    })?;
                 },
-                LseState::Bypass => unsafe {
-                    (*RCC).BDCR &= !(1 << 0);
-                    (*RCC).BDCR |= 1 << 1;
-                    (*RCC).BDCR |= 1 << 0;
+                LseState::Bypass => {
+                    self.rcc_reg.modify_bdcr(|mut reg: RegValue| {
+                        reg.clear_bits(1 << 0);  // Turn off LSE first
+                        reg.set_bits(1 << 1);    // Set bypass mode
+                        reg.set_bits(1 << 0);    // Turn on LSE
+                        reg
+                    })?;
                 },
             }
         }
 
-        if 0 != (config.oscillator_type as u32 & OscillatorType::LSI as u32) {
+        // Configure LSI
+        if (config.oscillator_type as u32 & OscillatorType::LSI as u32) != 0 {
             match config.lsi_state {
-                LsiState::On => unsafe {
-                    (*RCC).CSR |= 1 << 0;
+                LsiState::On => {
+                    self.rcc_reg.modify_csr(|mut reg: RegValue| {
+                        reg.set_bits(1 << 0);    // Turn on LSI
+                        reg
+                    })?;
                 },
-                LsiState::Off => unsafe {
-                    (*RCC).CSR &= !(1 << 0);
+                LsiState::Off => {
+                    self.rcc_reg.modify_csr(|mut reg| {
+                        reg.clear_bits(1 << 0);  // Turn off LSI
+                        reg
+                    })?;
                 },
             }
         }
 
+        // Configure PLL
         if config.pll.state != PllState::None {
-            unsafe {
-                (*RCC).CR &= !(1 << 24);
-            }
+            // Turn off PLL first
+            self.rcc_reg.modify_cr(|mut reg: RegValue| {
+                reg.clear_bits(1 << 24);  // Turn off PLL
+                reg
+            })?;
 
             if config.pll.state == PllState::On {
-                let pllcfgr_value: u32 = unsafe {
-                    let mut val: u32 = (*RCC).PLLCFGR;
-
-                    val &= !(0x3F << 0);
-                    val &= !(0x1FF << 6);
-                    val &= !(0x3 << 16);
-                    val &= !(0xF << 24);
-                    val &= !(1 << 22);
-
-                    val |= (config.pll.m as u32) & 0x3F;
-                    val |= ((config.pll.n as u32) & 0x1FF) << 6;
-                    val |= ((config.pll.p as u32) & 0x3) << 16;
-                    val |= ((config.pll.q as u32) & 0xF) << 24;
-                    val |= ((config.pll.source as u32) & 0x1) << 22;
+                // Configure PLLCFGR register
+                self.rcc_reg.modify_pllcfgr(|mut reg: RegValue| {
+                    // Clear all configurable bits
+                    reg.clear_bits(0x3F);           // Clear M bits
+                    reg.clear_bits(0x1FF << 6);     // Clear N bits
+                    reg.clear_bits(0x3 << 16);      // Clear P bits
+                    reg.clear_bits(0xF << 24);      // Clear Q bits
+                    reg.clear_bits(1 << 22);        // Clear source bit
                     
-                    val
-                };
-                
-                unsafe {
-                    (*RCC).PLLCFGR = pllcfgr_value;
-                    (*RCC).CR |= 1 << 24;
+                    // Set new values
+                    reg.set_bits((config.pll.m as u32) & 0x3F);
+                    reg.set_bits(((config.pll.n as u32) & 0x1FF) << 6);
+                    reg.set_bits(((config.pll.p as u32) & 0x3) << 16);
+                    reg.set_bits(((config.pll.q as u32) & 0xF) << 24);
+                    reg.set_bits(((config.pll.source as u32) & 0x1) << 22);
                     
-                    let mut timeout: i32 = 2000;
-                    while (0 == ((*RCC).CR & (1 << 25))) && (timeout > 0) {
-                        timeout -= 1;
-                    }
-                    
-                    if timeout == 0 {
-                        return Err(RccError::Timeout);
-                    }
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    pub fn clock_config(&self, config: &ClockConfig) -> Result<(), RccError> {
-        unsafe {
-            (*FLASH_R).ACR = ((*FLASH_R).ACR & !0xF) | 0x5;
-            
-            let mut timeout: i32 = 2000;
-            while (0x5 != ((*FLASH_R).ACR & 0xF)) && (timeout > 0) {
-                timeout -= 1;
-            }
-            
-            if 0 == timeout {
-                return Err(RccError::Timeout);
-            }
-        }
-
-        if 0 != (config.clock_type & (ClockType::HClock as u32)) {
-            unsafe {
-                (*RCC).CFGR = ((*RCC).CFGR & !(0x7 << 10)) | (0x7 << 10);
-                (*RCC).CFGR = ((*RCC).CFGR & !(0x7 << 13)) | (0x7 << 13);
+                    reg
+                })?;
                 
-                (*RCC).CFGR = ((*RCC).CFGR & !(0xF << 4)) | ((config.ahb_clk_divider as u32) << 4);
-            }
-        }
-
-        if 0 != (config.clock_type & (ClockType::SystemClock as u32)) {
-            let ready_bit: bool = match config.sys_clk_source {
-                SysClkSource::HSE => {
-                    unsafe {
-                        let mut timeout: i32 = 2000;
-                        while (((*RCC).CR & (1 << 17)) == 0) && (timeout > 0) {
-                            timeout -= 1;
-                        }
-                        
-                        if 0 == timeout {
-                            return Err(RccError::Timeout);
-                        }
-                    }
-                    true
-                },
-                SysClkSource::PllClk | SysClkSource::PllRClk => {
-                    unsafe {
-                        let mut timeout: i32 = 2000;
-                        while (((*RCC).CR & (1 << 25)) == 0) && (timeout > 0) {
-                            timeout -= 1;
-                        }
-                        
-                        if timeout == 0 {
-                            return Err(RccError::Timeout);
-                        }
-                    }
-                    true
-                },
-                SysClkSource::HSI => {
-                    unsafe {
-                        let mut timeout: i32 = 2000;
-                        while (((*RCC).CR & (1 << 1)) == 0) && (timeout > 0) {
-                            timeout -= 1;
-                        }
-                        
-                        if 0 == timeout {
-                            return Err(RccError::Timeout);
-                        }
-                    }
-                    true
-                },
-            };
-
-            if !ready_bit {
-                return Err(RccError::Timeout);
-            }
-
-            unsafe {
-                (*RCC).CFGR = ((*RCC).CFGR & !(0x3 << 0)) | ((config.sys_clk_source as u32) << 0);
+                // Turn on PLL
+                self.rcc_reg.modify_cr(|mut reg: RegValue| {
+                    reg.set_bits(1 << 24);  // Turn on PLL
+                    reg
+                })?;
                 
-                let sws_mask: u32 = config.sys_clk_source as u32;
+                // Wait for PLL to stabilize
                 let mut timeout: i32 = 2000;
-                while ((((*RCC).CFGR >> 2) & 0x3) != sws_mask) && (timeout > 0) {
+                while timeout > 0 {
+                    let cr_val = self.rcc_reg.read_cr()?;
+                    
+                    if (cr_val.get() & (1 << 25)) != 0 {
+                        break;
+                    }
+                    
                     timeout -= 1;
                 }
                 
@@ -418,18 +681,150 @@ impl<'a> RccHandle<'a> {
             }
         }
 
+        Ok(())
+    }
+
+    pub fn clock_config(&self, config: &ClockConfig) -> Result<(), RccError> {
+        // Configure flash latency
+        self.flash_reg.modify_acr(|mut reg: RegValue| {
+            reg.clear_bits(0xF);    // Clear latency bits
+            reg.set_bits(0x5);      // Set 5 wait states (for high speed)
+            reg
+        })?;
+        
+        // Wait for flash latency to update
+        let mut timeout: i32 = 2000;
+        while timeout > 0 {
+            let acr_val: RegValue = self.flash_reg.read_acr()?;
+            
+            if (acr_val.get() & 0xF) == 0x5 {
+                break;
+            }
+            
+            timeout -= 1;
+        }
+        
+        if timeout == 0 {
+            return Err(RccError::Timeout);
+        }
+
+        // Configure AHB, APB1, and APB2 prescalers
+        if (config.clock_type & (ClockType::HClock as u32)) != 0 {
+            self.rcc_reg.modify_cfgr(|mut reg: RegValue| {
+                // Clear the APB1 and APB2 prescaler bits first
+                reg.clear_bits(0x7 << 10);  // Clear APB1 prescaler bits
+                reg.clear_bits(0x7 << 13);  // Clear APB2 prescaler bits
+                
+                // Then set them to default values (1:1)
+                reg.set_bits(0x7 << 10);
+                reg.set_bits(0x7 << 13);
+                
+                // Clear and set AHB prescaler
+                reg.clear_bits(0xF << 4);   // Clear AHB prescaler bits
+                reg.set_bits((config.ahb_clk_divider as u32) << 4);
+                
+                reg
+            })?;
+        }
+
+        // Configure system clock source
+        if (config.clock_type & (ClockType::SystemClock as u32)) != 0 {
+            // Check clock source readiness
+            match config.sys_clk_source {
+                SysClkSource::HSE => {
+                    let mut timeout: i32 = 2000;
+                    while timeout > 0 {
+                        let cr_val: RegValue = self.rcc_reg.read_cr()?;
+                        
+                        if (cr_val.get() & (1 << 17)) != 0 {
+                            break;
+                        }
+                        
+                        timeout -= 1;
+                    }
+                    
+                    if timeout == 0 {
+                        return Err(RccError::Timeout);
+                    }
+                },
+                SysClkSource::PllClk | SysClkSource::PllRClk => {
+                    let mut timeout: i32 = 2000;
+                    while timeout > 0 {
+                        let cr_val: RegValue = self.rcc_reg.read_cr()?;
+                        
+                        if (cr_val.get() & (1 << 25)) != 0 {
+                            break;
+                        }
+                        
+                        timeout -= 1;
+                    }
+                    
+                    if timeout == 0 {
+                        return Err(RccError::Timeout);
+                    }
+                },
+                SysClkSource::HSI => {
+                    let mut timeout: i32 = 2000;
+                    while timeout > 0 {
+                        let cr_val: RegValue = self.rcc_reg.read_cr()?;
+                        
+                        if (cr_val.get() & (1 << 1)) != 0 {
+                            break;
+                        }
+                        
+                        timeout -= 1;
+                    }
+                    
+                    if timeout == 0 {
+                        return Err(RccError::Timeout);
+                    }
+                },
+            }
+
+            // Set system clock source
+            self.rcc_reg.modify_cfgr(|mut reg: RegValue| {
+                reg.clear_bits(0x3);  // Clear system clock source bits
+                reg.set_bits(config.sys_clk_source as u32);
+                reg
+            })?;
+            
+            // Wait for system clock switch
+            let sws_mask: u32 = config.sys_clk_source as u32;
+            let mut timeout: i32 = 2000;
+            while timeout > 0 {
+                let cfgr_val: RegValue = self.rcc_reg.read_cfgr()?;
+                
+                if ((cfgr_val.get() >> 2) & 0x3) == sws_mask {
+                    break;
+                }
+                
+                timeout -= 1;
+            }
+            
+            if timeout == 0 {
+                return Err(RccError::Timeout);
+            }
+        }
+
+        // Configure APB1 prescaler
         if (config.clock_type & (ClockType::PClock1 as u32)) != 0 {
-            unsafe {
-                (*RCC).CFGR = ((*RCC).CFGR & !(0x7 << 10)) | ((config.apb1_clk_divider as u32) << 10);
-            }
+            self.rcc_reg.modify_cfgr(|mut reg: RegValue| {
+                reg.clear_bits(0x7 << 10);  // Clear APB1 prescaler bits
+                reg.set_bits((config.apb1_clk_divider as u32) << 10);
+                reg
+            })?;
         }
 
-        if 0 != (config.clock_type & (ClockType::PClock2 as u32)) {
-            unsafe {
-                (*RCC).CFGR = ((*RCC).CFGR & !(0x7 << 13)) | ((config.apb2_clk_divider as u32) << 13);
-            }
+        // Configure APB2 prescaler
+        if (config.clock_type & (ClockType::PClock2 as u32)) != 0 {
+            self.rcc_reg.modify_cfgr(|mut reg: RegValue| {
+                reg.clear_bits(0x7 << 13);  // Clear APB2 prescaler bits
+                reg.set_bits((config.apb2_clk_divider as u32) << 13);
+                reg
+            })?;
         }
 
+        // Update system core clock
         unsafe {
             SYSTEM_CORE_CLOCK = self.get_sys_clock_freq();
         }
@@ -438,45 +833,35 @@ impl<'a> RccHandle<'a> {
     }
 
     pub fn get_sys_clock_freq(&self) -> u32 {
-        let sys_clk_freq: u32;
-        let clk_src: u32;
+        let cfgr_val: u32 = match self.rcc_reg.read_cfgr() {
+            Ok(val) => val.get(),
+            Err(_) => return HSI_VALUE,
+        };
         
-        unsafe {
-            clk_src = ((*RCC).CFGR >> 2) & 0x3;
-            
-            match clk_src {
-                0 => sys_clk_freq = HSI_VALUE,
-                1 => sys_clk_freq = HSE_VALUE,
-                2 => sys_clk_freq = self.get_pll_output_clock(),
-                _ => sys_clk_freq = HSI_VALUE,
-            }
+        let clk_src: u32 = (cfgr_val >> 2) & 0x3;
+        
+        match clk_src {
+            0 => HSI_VALUE,
+            1 => HSE_VALUE,
+            2 => self.get_pll_output_clock(),
+            _ => HSI_VALUE,
         }
-        
-        sys_clk_freq
     }
 
     pub fn get_pll_output_clock(&self) -> u32 {
-        let mut pll_source: u32;
-        let mut pll_input_freq: u32;
-        let mut pll_output_freq: u32;
+        let pllcfgr_val: u32 = match self.rcc_reg.read_pllcfgr() {
+            Ok(val) => val.get(),
+            Err(_) => return HSI_VALUE,
+        };
         
-        unsafe {
-            pll_source = ((*RCC).PLLCFGR >> 22) & 0x1;
-            
-            if 0 == pll_source {
-                pll_input_freq = HSI_VALUE;
-            } else {
-                pll_input_freq = HSE_VALUE;
-            }
-            
-            let pllm: u32 = ((*RCC).PLLCFGR & 0x3F) as u32;
-            let plln: u32 = (((*RCC).PLLCFGR >> 6) & 0x1FF) as u32;
-            let pllp_val: u32 = ((((*RCC).PLLCFGR >> 16) & 0x3) as u32) * 2 + 2;
-            
-            pll_output_freq = (pll_input_freq / pllm) * plln / pllp_val;
-        }
+        let pll_source: u32 = (pllcfgr_val >> 22) & 0x1;
+        let pll_input_freq: u32 = if pll_source == 0 { HSI_VALUE } else { HSE_VALUE };
         
-        pll_output_freq
+        let pllm: u32 = pllcfgr_val & 0x3F;
+        let plln: u32 = (pllcfgr_val >> 6) & 0x1FF;
+        let pllp_val: u32 = (((pllcfgr_val >> 16) & 0x3) * 2) + 2;
+        
+        (pll_input_freq / pllm) * plln / pllp_val
     }
 
     pub fn get_hclk_freq(&self) -> u32 {
@@ -486,79 +871,103 @@ impl<'a> RccHandle<'a> {
     }
 
     pub fn get_pclk1_freq(&self) -> u32 {
-        let mut pclk1: u32;
+        let cfgr_val: u32 = match self.rcc_reg.read_cfgr() {
+            Ok(val) => val.get(),
+            Err(_) => return 0,
+        };
+        
         let mut ahb_prescaler: u32 = 1;
         let mut apb1_prescaler: u32 = 1;
         
-        unsafe {
-            let temp: u32 = ((*RCC).CFGR >> 4) & 0xF;
-            if temp >= 8 {
-                ahb_prescaler = AHB_PRESCALER[(temp - 8) as usize] as u32;
-            }
-            
-            let temp: u32 = ((*RCC).CFGR >> 10) & 0x7;
-            if temp >= 4 {
-                apb1_prescaler = APB_PRESCALER[(temp - 4) as usize] as u32;
-            }
-            
-            pclk1 = SYSTEM_CORE_CLOCK / ahb_prescaler / apb1_prescaler;
+        let temp: u32 = (cfgr_val >> 4) & 0xF;
+        if temp >= 8 {
+            ahb_prescaler = AHB_PRESCALER[(temp - 8) as usize] as u32;
         }
         
-        pclk1
+        let temp: u32 = (cfgr_val >> 10) & 0x7;
+        if temp >= 4 {
+            apb1_prescaler = APB_PRESCALER[(temp - 4) as usize] as u32;
+        }
+        
+        self.get_hclk_freq() / ahb_prescaler / apb1_prescaler
     }
 
     pub fn get_pclk2_freq(&self) -> u32 {
-        let mut pclk2: u32;
+        let cfgr_val: u32 = match self.rcc_reg.read_cfgr() {
+            Ok(val) => val.get(),
+            Err(_) => return 0,
+        };
+        
         let mut ahb_prescaler: u32 = 1;
         let mut apb2_prescaler: u32 = 1;
         
-        unsafe {
-            let temp: u32 = ((*RCC).CFGR >> 4) & 0xF;
-            if temp >= 8 {
-                ahb_prescaler = AHB_PRESCALER[(temp - 8) as usize] as u32;
-            }
-            
-            let temp: u32 = ((*RCC).CFGR >> 13) & 0x7;
-            if temp >= 4 {
-                apb2_prescaler = APB_PRESCALER[(temp - 4) as usize] as u32;
-            }
-            
-            pclk2 = SYSTEM_CORE_CLOCK / ahb_prescaler / apb2_prescaler;
+        let temp: u32 = (cfgr_val >> 4) & 0xF;
+        if temp >= 8 {
+            ahb_prescaler = AHB_PRESCALER[(temp - 8) as usize] as u32;
         }
         
-        pclk2
+        let temp: u32 = (cfgr_val >> 13) & 0x7;
+        if temp >= 4 {
+            apb2_prescaler = APB_PRESCALER[(temp - 4) as usize] as u32;
+        }
+        
+        self.get_hclk_freq() / ahb_prescaler / apb2_prescaler
     }
 
-    pub fn enable_css(&self) {
-        unsafe {
-            (*RCC).CR |= 1 << 19;
-        }
+    pub fn enable_css(&self) -> Result<(), RccError> {
+        self.rcc_reg.modify_cr(|mut reg: RegValue| {
+            reg.set_bits(1 << 19);
+            reg
+        })
     }
 
-    pub fn disable_css(&self) {
-        unsafe {
-            (*RCC).CR &= !(1 << 19);
-        }
+    pub fn disable_css(&self) -> Result<(), RccError> {
+        self.rcc_reg.modify_cr(|mut reg: RegValue| {
+            reg.clear_bits(1 << 19);
+            reg
+        })
     }
 
     pub fn mco_config(&self, mco: McoIndex, source: u32, div: McoDiv) -> Result<(), RccError> {
         match mco {
-            McoIndex::Mco1 => unsafe {
-                (*RCC).CFGR = ((*RCC).CFGR & !(0x3 << 21)) | ((source & 0x3) << 21);
-                (*RCC).CFGR = ((*RCC).CFGR & !(0x7 << 24)) | ((div as u32) << 24);
+            McoIndex::Mco1 => {
+                self.rcc_reg.modify_cfgr(|mut reg: RegValue| {
+                    reg.clear_bits(0x3 << 21);
+                    reg.set_bits((source & 0x3) << 21);
+                    
+                    reg.clear_bits(0x7 << 24);
+                    reg.set_bits((div as u32) << 24);
+                    
+                    reg
+                })?;
             },
-            McoIndex::Mco2 => unsafe {
-                (*RCC).CFGR = ((*RCC).CFGR & !(0x3 << 30)) | ((source & 0x3) << 30);
-                (*RCC).CFGR = ((*RCC).CFGR & !(0x7 << 27)) | ((div as u32) << 27);
+            McoIndex::Mco2 => {
+                self.rcc_reg.modify_cfgr(|mut reg: RegValue| {
+                    reg.clear_bits(0x3 << 30);
+                    reg.set_bits((source & 0x3) << 30);
+                    
+                    reg.clear_bits(0x7 << 27);
+                    reg.set_bits((div as u32) << 27);
+                    
+                    reg
+                })?;
             },
         }
         
         Ok(())
     }
+    
+    // Added helper methods
+    pub fn enable_tim6_clock(&self) -> Result<(), RccError> {
+        self.rcc_reg.modify_apb1enr(|mut reg: RegValue| {
+            reg.set_bits(1 << 4);
+            reg
+        })
+    }
 }
 
 pub fn init_default_clocks() -> Result<RccHandle<'static>, RccError> {
-    let rcc: RccHandle<'_> = RccHandle::new();
+    let rcc: RccHandle<'_> = RccHandle::new()?;
     
     let osc_config: OscConfig = OscConfig {
         oscillator_type: OscillatorType::HSI,
@@ -575,7 +984,7 @@ pub fn init_default_clocks() -> Result<RccHandle<'static>, RccError> {
 }
 
 pub fn init_max_performance_clocks() -> Result<RccHandle<'static>, RccError> {
-    let rcc: RccHandle<'_> = RccHandle::new();
+    let rcc: RccHandle<'_> = RccHandle::new()?;
     
     let pll_config: PllConfig = PllConfig {
         state: PllState::On,
