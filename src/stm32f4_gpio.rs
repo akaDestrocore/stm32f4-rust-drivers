@@ -1,6 +1,5 @@
 use core::marker::PhantomData;
-use crate::stm32f4xx::{GPIOA, GPIOB, GPIOC, GPIOD, GPIOE, GPIOF, GPIOG, GPIOH, GPIOI, GPIORegDef, RCC};
-
+use crate::stm32f4xx::{GPIOA, GPIOB, GPIOC, GPIOD, GPIOE, GPIOF, GPIOG, GPIOH, GPIOI, GPIORegDef, RCC, RegValue};
 // Error type for GPIO operations
 #[derive(Debug, Clone, Copy)]
 pub enum GpioError {
@@ -79,31 +78,6 @@ pub enum GpioPin {
     Pin13 = 13,
     Pin14 = 14,
     Pin15 = 15,
-}
-
-#[derive(Copy, Clone)]
-struct RegValue(u32);
-
-impl RegValue {
-    fn new(value: u32) -> Self {
-        RegValue(value)
-    }
-    
-    fn get(&self) -> u32 {
-        self.0
-    }
-    
-    fn set_bits(&mut self, mask: u32) {
-        self.0 |= mask;
-    }
-    
-    fn clear_bits(&mut self, mask: u32) {
-        self.0 &= !mask;
-    }
-    
-    fn modify<F>(&mut self, f: F) where F: FnOnce(u32) -> u32 {
-        self.0 = f(self.0);
-    }
 }
 
 pub struct GpioPinConfig {

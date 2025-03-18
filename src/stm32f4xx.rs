@@ -965,3 +965,27 @@ pub const ADC2                                          : *mut ADCRegDef = ADC2_
 pub const ADC3                                          : *mut ADCRegDef = ADC3_BASE as *mut ADCRegDef;
 pub const ADC123_COMMON                                 : *mut ADCCommonRegDef = ADC123_COMMON_BASE as *mut ADCCommonRegDef;
 
+#[derive(Copy, Clone)]
+pub struct RegValue(pub u32);
+
+impl RegValue {
+    pub fn new(value: u32) -> Self {
+        RegValue(value)
+    }
+    
+    pub fn get(&self) -> u32 {
+        self.0
+    }
+    
+    pub fn set_bits(&mut self, mask: u32) {
+        self.0 |= mask;
+    }
+    
+    pub fn clear_bits(&mut self, mask: u32) {
+        self.0 &= !mask;
+    }
+    
+    pub fn modify<F>(&mut self, f: F) where F: FnOnce(u32) -> u32 {
+        self.0 = f(self.0);
+    }
+}

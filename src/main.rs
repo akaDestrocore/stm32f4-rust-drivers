@@ -25,7 +25,7 @@ fn init_delay_timer() {
     };
     
     // Enable TIM6
-    let _ = rcc_reg.modify_apb1enr(|mut reg: stm32f4_rust_drivers::stm32f4_rcc::RegValue| {
+    let _ = rcc_reg.modify_apb1enr(|mut reg: stm32f4_rust_drivers::stm32f4xx::RegValue| {
         reg.set_bits(1 << 4);
         reg
     });

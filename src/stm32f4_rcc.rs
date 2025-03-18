@@ -1,5 +1,5 @@
 use core::marker::PhantomData;
-use crate::stm32f4xx::{RCC, FLASH_R, RCCRegDef, FLASHRegDef};
+use crate::stm32f4xx::{RCC, FLASH_R, RCCRegDef, FLASHRegDef, RegValue};
 
 // Error type for RCC
 #[derive(Debug, Clone, Copy)]
@@ -217,32 +217,6 @@ const HSE_VALUE: u32 = 8_000_000;
 
 const AHB_PRESCALER: [u16; 8] = [2, 4, 8, 16, 64, 128, 256, 512];
 const APB_PRESCALER: [u16; 4] = [2, 4, 8, 16];
-
-// Helper struct for register value operations
-#[derive(Copy, Clone)]
-pub struct RegValue(u32);
-
-impl RegValue {
-    pub fn new(value: u32) -> Self {
-        RegValue(value)
-    }
-    
-    pub fn get(&self) -> u32 {
-        self.0
-    }
-    
-    pub fn set_bits(&mut self, mask: u32) {
-        self.0 |= mask;
-    }
-    
-    pub fn clear_bits(&mut self, mask: u32) {
-        self.0 &= !mask;
-    }
-    
-    pub fn modify<F>(&mut self, f: F) where F: FnOnce(u32) -> u32 {
-        self.0 = f(self.0);
-    }
-}
 
 // RCC register access
 pub struct RccRegister {
