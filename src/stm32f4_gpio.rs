@@ -1,5 +1,6 @@
 use core::marker::PhantomData;
 use crate::stm32f4xx::{GPIOA, GPIOB, GPIOC, GPIOD, GPIOE, GPIOF, GPIOG, GPIOH, GPIOI, GPIORegDef, RCC, RegValue};
+
 // Error type for GPIO operations
 #[derive(Debug, Clone, Copy)]
 pub enum GpioError {
@@ -80,36 +81,36 @@ pub enum GpioPin {
     Pin15 = 15,
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct GpioPinConfig {
-    pub pin_number: GpioPin,
+    pub pinnumber: GpioPin,
     pub mode: GpioMode,
     pub speed: GpioSpeed,
-    pub pull_type: GpioPullUpDown,
-    pub output_type: GpioOutputType,
-    pub alt_func: u8,
+    pub pulltype: GpioPullUpDown,
+    pub outputtype: GpioOutputType,
+    pub altfunc: u8,
 }
 
-impl GpioPinConfig {
-    pub fn new() -> Self {
+impl Default for GpioPinConfig {
+    fn default() -> Self {
         GpioPinConfig {
-            pin_number: GpioPin::Pin0,
+            pinnumber: GpioPin::Pin0,
             mode: GpioMode::Input,
             speed: GpioSpeed::Low,
-            pull_type: GpioPullUpDown::NoPull,
-            output_type: GpioOutputType::PushPull,
-            alt_func: 0,
+            pulltype: GpioPullUpDown::NoPull,
+            outputtype: GpioOutputType::PushPull,
+            altfunc: 0,
         }
     }
 }
 
-// Container for GPIO register access
-struct GpioRegister {
-    register: *mut GPIORegDef,
+pub struct GpioRegister {
+    reg: *mut GPIORegDef,
 }
 
 impl GpioRegister {
-    fn new(port: GpioPort) -> Result<Self, GpioError> {
-        let register: *mut GPIORegDef = match port {
+    pub fn new(port: GpioPort) -> Result<Self, GpioError> {
+        let reg = match port {
             GpioPort::GpioA => GPIOA,
             GpioPort::GpioB => GPIOB,
             GpioPort::GpioC => GPIOC,
@@ -121,62 +122,213 @@ impl GpioRegister {
             GpioPort::GpioI => GPIOI,
         };
         
-        Ok(GpioRegister { register })
-    }
-    
-    fn read_register(&self, offset: usize) -> Result<RegValue, GpioError> {
-        if self.register.is_null() {
+        if reg.is_null() {
             return Err(GpioError::InvalidPort);
         }
         
-        let value: u32 = unsafe {
-            match offset {
-                0 => (*self.register).MODER,
-                1 => (*self.register).OTYPER,
-                2 => (*self.register).OSPEEDR,
-                3 => (*self.register).PUPDR,
-                4 => (*self.register).IDR,
-                5 => (*self.register).ODR,
-                6 => (*self.register).BSRR,
-                7 => (*self.register).LCKR,
-                _ => return Err(GpioError::InvalidConfiguration),
-            }
-        };
+        Ok(GpioRegister { reg })
+    }
+    
+    // MODER register
+    pub fn read_moder(&self) -> Result<RegValue, GpioError> {
+        if self.reg.is_null() {
+            return Err(GpioError::InvalidPort);
+        }
         
+        let value = unsafe { (*self.reg).MODER };
         Ok(RegValue::new(value))
     }
     
-    fn write_register(&self, offset: usize, value: RegValue) -> Result<(), GpioError> {
-        if self.register.is_null() {
+    pub fn write_moder(&self, value: RegValue) -> Result<(), GpioError> {
+        if self.reg.is_null() {
             return Err(GpioError::InvalidPort);
         }
         
         unsafe {
-            match offset {
-                0 => (*self.register).MODER = value.get(),
-                1 => (*self.register).OTYPER = value.get(),
-                2 => (*self.register).OSPEEDR = value.get(),
-                3 => (*self.register).PUPDR = value.get(),
-                5 => (*self.register).ODR = value.get(),
-                6 => (*self.register).BSRR = value.get(),
-                7 => (*self.register).LCKR = value.get(),
-                _ => return Err(GpioError::InvalidConfiguration),
-            }
+            (*self.reg).MODER = value.get();
         }
         
         Ok(())
     }
     
-    fn modify_register<F>(&self, offset: usize, f: F) -> Result<(), GpioError> 
+    pub fn modify_moder<F>(&self, f: F) -> Result<(), GpioError> 
     where F: FnOnce(RegValue) -> RegValue {
-        let value: RegValue = self.read_register(offset)?;
-        let new_value: RegValue = f(value);
-        self.write_register(offset, new_value)
+        let value = self.read_moder()?;
+        let new_value = f(value);
+        self.write_moder(new_value)
     }
     
-    // Read AFR
-    fn read_afr(&self, index: usize) -> Result<RegValue, GpioError> {
-        if self.register.is_null() {
+    // OTYPER register
+    pub fn read_otyper(&self) -> Result<RegValue, GpioError> {
+        if self.reg.is_null() {
+            return Err(GpioError::InvalidPort);
+        }
+        
+        let value = unsafe { (*self.reg).OTYPER };
+        Ok(RegValue::new(value))
+    }
+    
+    pub fn write_otyper(&self, value: RegValue) -> Result<(), GpioError> {
+        if self.reg.is_null() {
+            return Err(GpioError::InvalidPort);
+        }
+        
+        unsafe {
+            (*self.reg).OTYPER = value.get();
+        }
+        
+        Ok(())
+    }
+    
+    pub fn modify_otyper<F>(&self, f: F) -> Result<(), GpioError> 
+    where F: FnOnce(RegValue) -> RegValue {
+        let value = self.read_otyper()?;
+        let new_value = f(value);
+        self.write_otyper(new_value)
+    }
+    
+    // OSPEEDR register
+    pub fn read_ospeedr(&self) -> Result<RegValue, GpioError> {
+        if self.reg.is_null() {
+            return Err(GpioError::InvalidPort);
+        }
+        
+        let value = unsafe { (*self.reg).OSPEEDR };
+        Ok(RegValue::new(value))
+    }
+    
+    pub fn write_ospeedr(&self, value: RegValue) -> Result<(), GpioError> {
+        if self.reg.is_null() {
+            return Err(GpioError::InvalidPort);
+        }
+        
+        unsafe {
+            (*self.reg).OSPEEDR = value.get();
+        }
+        
+        Ok(())
+    }
+    
+    pub fn modify_ospeedr<F>(&self, f: F) -> Result<(), GpioError> 
+    where F: FnOnce(RegValue) -> RegValue {
+        let value = self.read_ospeedr()?;
+        let new_value = f(value);
+        self.write_ospeedr(new_value)
+    }
+    
+    // PUPDR register
+    pub fn read_pupdr(&self) -> Result<RegValue, GpioError> {
+        if self.reg.is_null() {
+            return Err(GpioError::InvalidPort);
+        }
+        
+        let value = unsafe { (*self.reg).PUPDR };
+        Ok(RegValue::new(value))
+    }
+    
+    pub fn write_pupdr(&self, value: RegValue) -> Result<(), GpioError> {
+        if self.reg.is_null() {
+            return Err(GpioError::InvalidPort);
+        }
+        
+        unsafe {
+            (*self.reg).PUPDR = value.get();
+        }
+        
+        Ok(())
+    }
+    
+    pub fn modify_pupdr<F>(&self, f: F) -> Result<(), GpioError> 
+    where F: FnOnce(RegValue) -> RegValue {
+        let value = self.read_pupdr()?;
+        let new_value = f(value);
+        self.write_pupdr(new_value)
+    }
+    
+    // IDR register
+    pub fn read_idr(&self) -> Result<RegValue, GpioError> {
+        if self.reg.is_null() {
+            return Err(GpioError::InvalidPort);
+        }
+        
+        let value = unsafe { (*self.reg).IDR };
+        Ok(RegValue::new(value))
+    }
+    
+    // ODR register
+    pub fn read_odr(&self) -> Result<RegValue, GpioError> {
+        if self.reg.is_null() {
+            return Err(GpioError::InvalidPort);
+        }
+        
+        let value = unsafe { (*self.reg).ODR };
+        Ok(RegValue::new(value))
+    }
+    
+    pub fn write_odr(&self, value: RegValue) -> Result<(), GpioError> {
+        if self.reg.is_null() {
+            return Err(GpioError::InvalidPort);
+        }
+        
+        unsafe {
+            (*self.reg).ODR = value.get();
+        }
+        
+        Ok(())
+    }
+    
+    pub fn modify_odr<F>(&self, f: F) -> Result<(), GpioError> 
+    where F: FnOnce(RegValue) -> RegValue {
+        let value = self.read_odr()?;
+        let new_value = f(value);
+        self.write_odr(new_value)
+    }
+    
+    // BSRR register
+    pub fn write_bsrr(&self, value: RegValue) -> Result<(), GpioError> {
+        if self.reg.is_null() {
+            return Err(GpioError::InvalidPort);
+        }
+        
+        unsafe {
+            (*self.reg).BSRR = value.get();
+        }
+        
+        Ok(())
+    }
+    
+    // LCKR register
+    pub fn read_lckr(&self) -> Result<RegValue, GpioError> {
+        if self.reg.is_null() {
+            return Err(GpioError::InvalidPort);
+        }
+        
+        let value = unsafe { (*self.reg).LCKR };
+        Ok(RegValue::new(value))
+    }
+    
+    pub fn write_lckr(&self, value: RegValue) -> Result<(), GpioError> {
+        if self.reg.is_null() {
+            return Err(GpioError::InvalidPort);
+        }
+        
+        unsafe {
+            (*self.reg).LCKR = value.get();
+        }
+        
+        Ok(())
+    }
+    
+    pub fn modify_lckr<F>(&self, f: F) -> Result<(), GpioError> 
+    where F: FnOnce(RegValue) -> RegValue {
+        let value = self.read_lckr()?;
+        let new_value = f(value);
+        self.write_lckr(new_value)
+    }
+    
+    // AFR registers
+    pub fn read_afr(&self, index: usize) -> Result<RegValue, GpioError> {
+        if self.reg.is_null() {
             return Err(GpioError::InvalidPort);
         }
         
@@ -184,14 +336,12 @@ impl GpioRegister {
             return Err(GpioError::InvalidConfiguration);
         }
         
-        let value: u32 = unsafe { (*self.register).AFR[index] };
-        
+        let value = unsafe { (*self.reg).AFR[index] };
         Ok(RegValue::new(value))
     }
     
-    // Write to AFR
-    fn write_afr(&self, index: usize, value: RegValue) -> Result<(), GpioError> {
-        if self.register.is_null() {
+    pub fn write_afr(&self, index: usize, value: RegValue) -> Result<(), GpioError> {
+        if self.reg.is_null() {
             return Err(GpioError::InvalidPort);
         }
         
@@ -200,23 +350,22 @@ impl GpioRegister {
         }
         
         unsafe {
-            (*self.register).AFR[index] = value.get();
+            (*self.reg).AFR[index] = value.get();
         }
         
         Ok(())
     }
     
-    // Safe modification of AFR register values
-    fn modify_afr<F>(&self, index: usize, f: F) -> Result<(), GpioError> 
+    pub fn modify_afr<F>(&self, index: usize, f: F) -> Result<(), GpioError> 
     where F: FnOnce(RegValue) -> RegValue {
-        let value: RegValue = self.read_afr(index)?;
-        let new_value: RegValue = f(value);
+        let value = self.read_afr(index)?;
+        let new_value = f(value);
         self.write_afr(index, new_value)
     }
     
-    // Get raw register pointer for operations that need direct access
-    fn get_raw_ptr(&self) -> *mut GPIORegDef {
-        self.register
+    // for operations that need direct access
+    pub fn get_raw_ptr(&self) -> *mut GPIORegDef {
+        self.reg
     }
 }
 
@@ -228,17 +377,15 @@ pub struct GpioHandle<'a> {
 }
 
 impl<'a> GpioHandle<'a> {
-    pub fn new(port: GpioPort) -> Self {
-        let register: GpioRegister = GpioRegister::new(port).unwrap_or_else(|_| {
-            GpioRegister { register: core::ptr::null_mut() }
-        });
+    pub fn new(port: GpioPort) -> Result<Self, GpioError> {
+        let register = GpioRegister::new(port)?;
         
-        GpioHandle {
+        Ok(GpioHandle {
             pgpiox: register.get_raw_ptr(),
-            config: GpioPinConfig::new(),
+            config: GpioPinConfig::default(),
             register,
             _marker: PhantomData,
-        }
+        })
     }
 
     pub fn config_pin(
@@ -250,78 +397,76 @@ impl<'a> GpioHandle<'a> {
         output_type: GpioOutputType,
         alt_func: u8,
     ) -> Result<(), GpioError> {
-        self.config.pin_number = pin;
+        self.config.pinnumber = pin;
         self.config.mode = mode;
         self.config.speed = speed;
-        self.config.pull_type = pull_type;
-        self.config.output_type = output_type;
-        self.config.alt_func = alt_func;
+        self.config.pulltype = pull_type;
+        self.config.outputtype = output_type;
+        self.config.altfunc = alt_func;
         Ok(())
     }
 
     pub fn init(&self) -> Result<(), GpioError> {
-        // Enable clock for the GPIO port
+        // Enable GPIO clock
         Gpio::periph_clock_control(self.pgpiox, State::Enable)?;
 
-        let pin: u8 = self.config.pin_number as u8;
+        let pin = self.config.pinnumber as u8;
 
         // Configure MODER
         if let GpioMode::Input | GpioMode::Output | GpioMode::AlternateFunction | GpioMode::Analog = self.config.mode {
-            let mode_value: u32 = self.config.mode as u32;
-            let mode_shift: u8 = u8::checked_mul(pin, 2).ok_or(GpioError::InvalidPin)?;
-            let mode_mask: u32 = u32::checked_shl(0x3, mode_shift.into()).ok_or(GpioError::InvalidPin)?;
+            let mode_value = self.config.mode as u32;
+            let mode_shift = u8::checked_mul(pin, 2).ok_or(GpioError::InvalidPin)?;
+            let mode_mask = u32::checked_shl(0x3, mode_shift.into()).ok_or(GpioError::InvalidPin)?;
             
-            self.register.modify_register(0, |mut reg: RegValue| {
+            self.register.modify_moder(|mut reg| {
                 reg.clear_bits(mode_mask);
                 reg.set_bits(u32::checked_shl(mode_value, mode_shift.into()).unwrap_or(0));
                 reg
             })?;
-        } else {
-
         }
 
-        // Configure SPEEDR
-        let speed_value: u32 = self.config.speed as u32;
-        let speed_shift: u8 = u8::checked_mul(pin, 2).ok_or(GpioError::InvalidPin)?;
-        let speed_mask: u32 = u32::checked_shl(0x3, speed_shift.into()).ok_or(GpioError::InvalidPin)?;
+        // Configure OSPEEDR
+        let speed_value = self.config.speed as u32;
+        let speed_shift = u8::checked_mul(pin, 2).ok_or(GpioError::InvalidPin)?;
+        let speed_mask = u32::checked_shl(0x3, speed_shift.into()).ok_or(GpioError::InvalidPin)?;
         
-        self.register.modify_register(2, |mut reg| {
+        self.register.modify_ospeedr(|mut reg| {
             reg.clear_bits(speed_mask);
             reg.set_bits(u32::checked_shl(speed_value, speed_shift.into()).unwrap_or(0));
             reg
         })?;
 
-        // Configure pull-up/pull-down register
-        let pupd_value: u32 = self.config.pull_type as u32;
-        let pupd_shift: u8 = u8::checked_mul(pin, 2).ok_or(GpioError::InvalidPin)?;
-        let pupd_mask: u32 = u32::checked_shl(0x3, pupd_shift.into()).ok_or(GpioError::InvalidPin)?;
+        // Configure PUPDR
+        let pupd_value = self.config.pulltype as u32;
+        let pupd_shift = u8::checked_mul(pin, 2).ok_or(GpioError::InvalidPin)?;
+        let pupd_mask = u32::checked_shl(0x3, pupd_shift.into()).ok_or(GpioError::InvalidPin)?;
         
-        self.register.modify_register(3, |mut reg: RegValue| {
+        self.register.modify_pupdr(|mut reg| {
             reg.clear_bits(pupd_mask);
             reg.set_bits(u32::checked_shl(pupd_value, pupd_shift.into()).unwrap_or(0));
             reg
         })?;
 
         // Configure OTYPER
-        let otype_value: u32 = self.config.output_type as u32;
-        let otype_shift: u8 = pin;
-        let otype_mask: u32 = u32::checked_shl(0x1, otype_shift.into()).ok_or(GpioError::InvalidPin)?;
+        let otype_value = self.config.outputtype as u32;
+        let otype_shift = pin;
+        let otype_mask = u32::checked_shl(0x1, otype_shift.into()).ok_or(GpioError::InvalidPin)?;
         
-        self.register.modify_register(1, |mut reg| {
+        self.register.modify_otyper(|mut reg| {
             reg.clear_bits(otype_mask);
             reg.set_bits(u32::checked_shl(otype_value, otype_shift.into()).unwrap_or(0));
             reg
         })?;
 
-        // Configure alternate function register if needed
+        // Configure AFR if needed
         if let GpioMode::AlternateFunction = self.config.mode {
-            let afr_index: usize = (pin / 8) as usize;
-            let afr_shift: u8 = (pin % 8) * 4;
-            let afr_mask: u32 = 0xF << afr_shift;
+            let afr_index = (pin / 8) as usize;
+            let afr_shift = (pin % 8) * 4;
+            let afr_mask = 0xF << afr_shift;
             
-            self.register.modify_afr(afr_index, |mut reg: RegValue| {
+            self.register.modify_afr(afr_index, |mut reg| {
                 reg.clear_bits(afr_mask);
-                reg.set_bits((self.config.alt_func as u32) << afr_shift);
+                reg.set_bits((self.config.altfunc as u32) << afr_shift);
                 reg
             })?;
         }
@@ -330,15 +475,165 @@ impl<'a> GpioHandle<'a> {
     }
     
     pub fn write(&self, state: u8) -> Result<(), GpioError> {
-        Gpio::write_pin(self.pgpiox, self.config.pin_number, state)
+        Gpio::write_pin(self.pgpiox, self.config.pinnumber, state)
     }
     
     pub fn read(&self) -> Result<u8, GpioError> {
-        Gpio::read_pin(self.pgpiox, self.config.pin_number)
+        Gpio::read_pin(self.pgpiox, self.config.pinnumber)
     }
     
     pub fn toggle(&self) -> Result<(), GpioError> {
-        Gpio::toggle_pin(self.pgpiox, self.config.pin_number)
+        Gpio::toggle_pin(self.pgpiox, self.config.pinnumber)
+    }
+    
+    pub fn set_pin(&self) -> Result<(), GpioError> {
+        Gpio::write_pin(self.pgpiox, self.config.pinnumber, 1)
+    }
+    
+    pub fn reset_pin(&self) -> Result<(), GpioError> {
+        Gpio::write_pin(self.pgpiox, self.config.pinnumber, 0)
+    }
+    
+    pub fn get_port_value(&self) -> Result<u16, GpioError> {
+        Gpio::read_port(self.pgpiox)
+    }
+    
+    pub fn write_port(&self, value: u16) -> Result<(), GpioError> {
+        Gpio::write_port(self.pgpiox, value)
+    }
+}
+
+pub struct Gpio;
+
+impl Gpio {
+    pub fn periph_clock_control(pgpiox: *mut GPIORegDef, state: State) -> Result<(), GpioError> {
+        if pgpiox.is_null() {
+            return Err(GpioError::InvalidPort);
+        }
+        
+        let rcc_handle = crate::stm32f4_rcc::RccHandle::new()
+            .map_err(|_| GpioError::HardwareFault)?;
+            
+        let gpio_base = pgpiox as u32;
+        
+        rcc_handle.gpio_clock_control(gpio_base, state == State::Enable)
+            .map_err(|_| GpioError::HardwareFault)
+    }
+
+    pub fn deinit(pgpiox: *mut GPIORegDef) -> Result<(), GpioError> {
+        if pgpiox.is_null() {
+            return Err(GpioError::InvalidPort);
+        }
+        
+        let rcc_handle = crate::stm32f4_rcc::RccHandle::new()
+            .map_err(|_| GpioError::HardwareFault)?;
+        
+        let rcc_reg = &rcc_handle.rcc_reg;
+        
+        let bit_pos = if pgpiox == GPIOA {
+            0
+        } else if pgpiox == GPIOB {
+            1
+        } else if pgpiox == GPIOC {
+            2
+        } else if pgpiox == GPIOD {
+            3
+        } else if pgpiox == GPIOE {
+            4
+        } else if pgpiox == GPIOF {
+            5
+        } else if pgpiox == GPIOG {
+            6
+        } else if pgpiox == GPIOH {
+            7
+        } else if pgpiox == GPIOI {
+            8
+        } else {
+            return Err(GpioError::InvalidPort);
+        };
+        
+        rcc_reg.reset_peripheral("AHB1", bit_pos)
+            .map_err(|_| GpioError::HardwareFault)
+    }
+
+    pub fn read_pin(pgpiox: *mut GPIORegDef, pin: GpioPin) -> Result<u8, GpioError> {
+        if pgpiox.is_null() {
+            return Err(GpioError::InvalidPort);
+        }
+        
+        let pin_number = pin as u8;
+        let reg = GpioRegister { reg: pgpiox };
+        
+        // Read the IDR
+        let idr_value = reg.read_idr()?.get();
+        
+        // Extract the pin value
+        let pin_value = (idr_value >> pin_number) & 0x1;
+        
+        Ok(pin_value as u8)
+    }
+
+    pub fn read_port(pgpiox: *mut GPIORegDef) -> Result<u16, GpioError> {
+        if pgpiox.is_null() {
+            return Err(GpioError::InvalidPort);
+        }
+        
+        let reg = GpioRegister { reg: pgpiox };
+        
+        // Read the IDR
+        let idr_value = reg.read_idr()?.get();
+        
+        // The port value is the lower 16 bits of IDR
+        Ok((idr_value & 0xFFFF) as u16)
+    }
+
+    pub fn write_pin(pgpiox: *mut GPIORegDef, pin: GpioPin, value: u8) -> Result<(), GpioError> {
+        if pgpiox.is_null() {
+            return Err(GpioError::InvalidPort);
+        }
+        
+        let pin_number = pin as u8;
+        let reg = GpioRegister { reg: pgpiox };
+        
+        // Use BSRR for atomic bit set/reset
+        if 1 == value {
+            // Set the pin
+            reg.write_bsrr(RegValue::new(1 << pin_number))?;
+        } else {
+            // Reset the pin
+            reg.write_bsrr(RegValue::new(1 << (pin_number + 16)))?;
+        }
+        
+        Ok(())
+    }
+
+    pub fn write_port(pgpiox: *mut GPIORegDef, value: u16) -> Result<(), GpioError> {
+        if pgpiox.is_null() {
+            return Err(GpioError::InvalidPort);
+        }
+        
+        let reg = GpioRegister { reg: pgpiox };
+        
+        // Write the value to the ODR
+        reg.write_odr(RegValue::new(value as u32))?;
+        
+        Ok(())
+    }
+
+    pub fn toggle_pin(pgpiox: *mut GPIORegDef, pin: GpioPin) -> Result<(), GpioError> {
+        if pgpiox.is_null() {
+            return Err(GpioError::InvalidPort);
+        }
+        
+        let pin_number = pin as u8;
+        let reg = GpioRegister { reg: pgpiox };
+        
+        reg.modify_odr(|mut reg_val| {
+            reg_val.modify(|val| val ^ (1 << pin_number));
+            reg_val
+        })?;
+        
+        Ok(())
     }
 }
 
@@ -350,214 +645,22 @@ pub fn init_gpio_pin(
     pull_type: GpioPullUpDown,
     output_type: GpioOutputType,
 ) -> Result<GpioHandle<'static>, GpioError> {
-    let mut handle: GpioHandle<'_> = GpioHandle::new(port);
+    let mut handle = GpioHandle::new(port)?;
     handle.config_pin(pin, mode, speed, pull_type, output_type, 0)?;
     handle.init()?;
     Ok(handle)
 }
 
-pub struct Gpio;
-
-impl Gpio {
-    pub fn periph_clock_control(pgpiox: *mut GPIORegDef, state: State) -> Result<(), GpioError> {
-        if pgpiox.is_null() {
-            return Err(GpioError::InvalidPort);
-        }
-        
-        let state_bit: u32 = state as u32;
-        
-        // temp wrapper for RCC
-        struct RccRegister;
-        
-        impl RccRegister {
-            fn modify_ahb1enr<F>(f: F) -> Result<(), GpioError> 
-            where F: FnOnce(u32) -> u32 {
-                unsafe {
-                    if RCC.is_null() {
-                        return Err(GpioError::HardwareFault);
-                    }
-                    
-                    let current: u32 = (*RCC).AHB1ENR;
-                    (*RCC).AHB1ENR = f(current);
-                }
-                Ok(())
-            }
-        }
-        
-        // Determine the bit position based on which GPIO port we're using
-        let bit_position: i32 = if pgpiox == GPIOA {
-            0
-        } else if pgpiox == GPIOB {
-            1
-        } else if pgpiox == GPIOC {
-            2
-        } else if pgpiox == GPIOD {
-            3
-        } else if pgpiox == GPIOE {
-            4
-        } else if pgpiox == GPIOF {
-            5
-        } else if pgpiox == GPIOG {
-            6
-        } else if pgpiox == GPIOH {
-            7
-        } else if pgpiox == GPIOI {
-            8
-        } else {
-            return Err(GpioError::InvalidPort);
-        };
-        
-        // Modify the RCC AHB1ENR register to enable/disable the GPIO clock
-        RccRegister::modify_ahb1enr(|reg: u32| {
-            if state == State::Enable {
-                reg | (state_bit << bit_position)
-            } else {
-                reg & !(1 << bit_position)
-            }
-        })?;
-        
-        Ok(())
-    }
-
-    pub fn deinit(pgpiox: *mut GPIORegDef) -> Result<(), GpioError> {
-        if pgpiox.is_null() {
-            return Err(GpioError::InvalidPort);
-        }
-        
-        // Create temp RCC wrapper
-        struct RccRegister;
-        
-        impl RccRegister {
-            fn modify_ahb1rstr<F>(f: F) -> Result<(), GpioError> 
-            where F: FnOnce(u32) -> u32 {
-                unsafe {
-                    if RCC.is_null() {
-                        return Err(GpioError::HardwareFault);
-                    }
-                    
-                    let current: u32 = (*RCC).AHB1RSTR;
-                    (*RCC).AHB1RSTR = f(current);
-                }
-                Ok(())
-            }
-        }
-        
-        // Determine the bit position based on which GPIO port we're using
-        let bit_position: i32 = if pgpiox == GPIOA {
-            0
-        } else if pgpiox == GPIOB {
-            1
-        } else if pgpiox == GPIOC {
-            2
-        } else if pgpiox == GPIOD {
-            3
-        } else if pgpiox == GPIOE {
-            4
-        } else if pgpiox == GPIOF {
-            5
-        } else if pgpiox == GPIOG {
-            6
-        } else if pgpiox == GPIOH {
-            7
-        } else if pgpiox == GPIOI {
-            8
-        } else {
-            return Err(GpioError::InvalidPort);
-        };
-        
-        // First set the reset bit
-        RccRegister::modify_ahb1rstr(|reg: u32| reg | (1 << bit_position))?;
-        
-        // Then clear it
-        RccRegister::modify_ahb1rstr(|reg: u32| reg & !(1 << bit_position))?;
-        
-        Ok(())
-    }
-
-    pub fn read_pin(pgpiox: *mut GPIORegDef, pin: GpioPin) -> Result<u8, GpioError> {
-        if pgpiox.is_null() {
-            return Err(GpioError::InvalidPort);
-        }
-        
-        let pin_number: u8 = pin as u8;
-        
-        // Read the IDR
-        let idr_value: u32 = unsafe { (*pgpiox).IDR };
-        
-        // Extract the pin value using safe bit operations
-        let pin_value: u32 = (idr_value >> pin_number) & 0x1;
-        
-        Ok(pin_value as u8)
-    }
-
-    pub fn read_port(pgpiox: *mut GPIORegDef) -> Result<u16, GpioError> {
-        if pgpiox.is_null() {
-            return Err(GpioError::InvalidPort);
-        }
-        
-        // Read the IDR
-        let idr_value: u32 = unsafe { (*pgpiox).IDR };
-        
-        // The port value is the lower 16 bits of IDR
-        Ok((idr_value & 0xFFFF) as u16)
-    }
-
-    pub fn write_pin(pgpiox: *mut GPIORegDef, pin: GpioPin, value: u8) -> Result<(), GpioError> {
-        if pgpiox.is_null() {
-            return Err(GpioError::InvalidPort);
-        }
-        
-        let pin_number: u8 = pin as u8;
-        
-        // Get current ODR value
-        let odr_value: u32 = unsafe { (*pgpiox).ODR };
-        
-        // Modify the ODR value based on the requested pin value
-        let new_odr_value: u32 = if value == 1 {
-            odr_value | (1 << pin_number)
-        } else {
-            odr_value & !(1 << pin_number)
-        };
-        
-        // Write the new ODR value
-        unsafe {
-            (*pgpiox).ODR = new_odr_value;
-        }
-        
-        Ok(())
-    }
-
-    pub fn write_port(pgpiox: *mut GPIORegDef, value: u16) -> Result<(), GpioError> {
-        if pgpiox.is_null() {
-            return Err(GpioError::InvalidPort);
-        }
-        
-        // Write the value to the ODR
-        unsafe {
-            (*pgpiox).ODR = value as u32;
-        }
-        
-        Ok(())
-    }
-
-    pub fn toggle_pin(pgpiox: *mut GPIORegDef, pin: GpioPin) -> Result<(), GpioError> {
-        if pgpiox.is_null() {
-            return Err(GpioError::InvalidPort);
-        }
-        
-        let pin_number: u8 = pin as u8;
-        
-        // Get current ODR value
-        let odr_value: u32 = unsafe { (*pgpiox).ODR };
-        
-        // Toggle the pin by XORing with 1 at the pin position
-        let new_odr_value: u32 = odr_value ^ (1 << pin_number);
-        
-        // Write the new ODR value
-        unsafe {
-            (*pgpiox).ODR = new_odr_value;
-        }
-        
-        Ok(())
-    }
+pub fn init_gpio_pin_with_af(
+    port: GpioPort,
+    pin: GpioPin,
+    speed: GpioSpeed,
+    pull_type: GpioPullUpDown,
+    output_type: GpioOutputType,
+    alt_func: u8,
+) -> Result<GpioHandle<'static>, GpioError> {
+    let mut handle = GpioHandle::new(port)?;
+    handle.config_pin(pin, GpioMode::AlternateFunction, speed, pull_type, output_type, alt_func)?;
+    handle.init()?;
+    Ok(handle)
 }
