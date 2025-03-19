@@ -220,7 +220,7 @@ const APB_PRESCALER: [u16; 4] = [2, 4, 8, 16];
 
 // RCC register access
 pub struct RccRegister {
-    register: *mut RCCRegDef,
+    reg: *mut RCCRegDef,
 }
 
 impl RccRegister {
@@ -229,224 +229,517 @@ impl RccRegister {
             return Err(RccError::HardwareFault);
         }
         
-        Ok(RccRegister { register: RCC })
+        Ok(RccRegister { reg: RCC })
     }
     
-    // Read CR register
-    pub fn read_cr(&self) -> Result<RegValue, RccError> {
-        if self.register.is_null() {
+    // Helper method to read any register
+    fn read_register(&self, offset: usize) -> Result<RegValue, RccError> {
+        if self.reg.is_null() {
             return Err(RccError::HardwareFault);
         }
         
-        let value: u32 = unsafe { (*self.register).CR };
+        let value = unsafe {
+            match offset {
+                0x00 => (*self.reg).CR,
+                0x04 => (*self.reg).PLLCFGR,
+                0x08 => (*self.reg).CFGR,
+                0x0C => (*self.reg).CIR,
+                0x10 => (*self.reg).AHB1RSTR,
+                0x14 => (*self.reg).AHB2RSTR,
+                0x18 => (*self.reg).AHB3RSTR,
+                0x20 => (*self.reg).APB1RSTR,
+                0x24 => (*self.reg).APB2RSTR,
+                0x30 => (*self.reg).AHB1ENR,
+                0x34 => (*self.reg).AHB2ENR,
+                0x38 => (*self.reg).AHB3ENR,
+                0x40 => (*self.reg).APB1ENR,
+                0x44 => (*self.reg).APB2ENR,
+                0x50 => (*self.reg).AHB1LPENR,
+                0x54 => (*self.reg).AHB2LPENR,
+                0x58 => (*self.reg).AHB3LPENR,
+                0x60 => (*self.reg).APB1LPENR,
+                0x64 => (*self.reg).APB2LPENR,
+                0x70 => (*self.reg).BDCR,
+                0x74 => (*self.reg).CSR,
+                0x80 => (*self.reg).SSCGR,
+                0x84 => (*self.reg).PLLI2SCFGR,
+                _ => return Err(RccError::InvalidConfiguration),
+            }
+        };
+        
         Ok(RegValue::new(value))
     }
     
-    // Write CR register
-    pub fn write_cr(&self, value: RegValue) -> Result<(), RccError> {
-        if self.register.is_null() {
+    // Helper method to write any register
+    fn write_register(&self, offset: usize, value: RegValue) -> Result<(), RccError> {
+        if self.reg.is_null() {
             return Err(RccError::HardwareFault);
         }
         
         unsafe {
-            (*self.register).CR = value.get();
-        }
+            match offset {
+                0x00 => (*self.reg).CR = value.get(),
+                0x04 => (*self.reg).PLLCFGR = value.get(),
+                0x08 => (*self.reg).CFGR = value.get(),
+                0x0C => (*self.reg).CIR = value.get(),
+                0x10 => (*self.reg).AHB1RSTR = value.get(),
+                0x14 => (*self.reg).AHB2RSTR = value.get(),
+                0x18 => (*self.reg).AHB3RSTR = value.get(),
+                0x20 => (*self.reg).APB1RSTR = value.get(),
+                0x24 => (*self.reg).APB2RSTR = value.get(),
+                0x30 => (*self.reg).AHB1ENR = value.get(),
+                0x34 => (*self.reg).AHB2ENR = value.get(),
+                0x38 => (*self.reg).AHB3ENR = value.get(),
+                0x40 => (*self.reg).APB1ENR = value.get(),
+                0x44 => (*self.reg).APB2ENR = value.get(),
+                0x50 => (*self.reg).AHB1LPENR = value.get(),
+                0x54 => (*self.reg).AHB2LPENR = value.get(),
+                0x58 => (*self.reg).AHB3LPENR = value.get(),
+                0x60 => (*self.reg).APB1LPENR = value.get(),
+                0x64 => (*self.reg).APB2LPENR = value.get(),
+                0x70 => (*self.reg).BDCR = value.get(),
+                0x74 => (*self.reg).CSR = value.get(),
+                0x80 => (*self.reg).SSCGR = value.get(),
+                0x84 => (*self.reg).PLLI2SCFGR = value.get(),
+                _ => return Err(RccError::InvalidConfiguration),
+            }
+        };
         
         Ok(())
     }
     
-    // Modify CR register
+    // Helper method to modify any register
+    fn modify_register<F>(&self, offset: usize, f: F) -> Result<(), RccError> 
+    where F: FnOnce(RegValue) -> RegValue {
+        let value = self.read_register(offset)?;
+        let new_value = f(value);
+        self.write_register(offset, new_value)
+    }
+    
+    // CR
+    pub fn read_cr(&self) -> Result<RegValue, RccError> {
+        self.read_register(0x00)
+    }
+    
+    pub fn write_cr(&self, value: RegValue) -> Result<(), RccError> {
+        self.write_register(0x00, value)
+    }
+    
     pub fn modify_cr<F>(&self, f: F) -> Result<(), RccError> 
     where F: FnOnce(RegValue) -> RegValue {
-        let value: RegValue = self.read_cr()?;
-        let new_value: RegValue = f(value);
-        self.write_cr(new_value)
+        self.modify_register(0x00, f)
     }
     
-    // Read CFGR register
-    pub fn read_cfgr(&self) -> Result<RegValue, RccError> {
-        if self.register.is_null() {
-            return Err(RccError::HardwareFault);
-        }
-        
-        let value: u32 = unsafe { (*self.register).CFGR };
-        Ok(RegValue::new(value))
-    }
-    
-    // Write CFGR register
-    pub fn write_cfgr(&self, value: RegValue) -> Result<(), RccError> {
-        if self.register.is_null() {
-            return Err(RccError::HardwareFault);
-        }
-        
-        unsafe {
-            (*self.register).CFGR = value.get();
-        }
-        
-        Ok(())
-    }
-    
-    // Modify CFGR register
-    pub fn modify_cfgr<F>(&self, f: F) -> Result<(), RccError> 
-    where F: FnOnce(RegValue) -> RegValue {
-        let value: RegValue = self.read_cfgr()?;
-        let new_value: RegValue = f(value);
-        self.write_cfgr(new_value)
-    }
-    
-    // Read PLLCFGR register
+    // PLLCFGR
     pub fn read_pllcfgr(&self) -> Result<RegValue, RccError> {
-        if self.register.is_null() {
-            return Err(RccError::HardwareFault);
-        }
-        
-        let value: u32 = unsafe { (*self.register).PLLCFGR };
-        Ok(RegValue::new(value))
+        self.read_register(0x04)
     }
     
-    // Write PLLCFGR register
     pub fn write_pllcfgr(&self, value: RegValue) -> Result<(), RccError> {
-        if self.register.is_null() {
-            return Err(RccError::HardwareFault);
-        }
-        
-        unsafe {
-            (*self.register).PLLCFGR = value.get();
-        }
-        
-        Ok(())
+        self.write_register(0x04, value)
     }
     
-    // Modify PLLCFGR register
     pub fn modify_pllcfgr<F>(&self, f: F) -> Result<(), RccError> 
     where F: FnOnce(RegValue) -> RegValue {
-        let value: RegValue = self.read_pllcfgr()?;
-        let new_value: RegValue = f(value);
-        self.write_pllcfgr(new_value)
+        self.modify_register(0x04, f)
     }
     
-    // Read BDCR register
-    pub fn read_bdcr(&self) -> Result<RegValue, RccError> {
-        if self.register.is_null() {
-            return Err(RccError::HardwareFault);
-        }
-        
-        let value: u32 = unsafe { (*self.register).BDCR };
-        Ok(RegValue::new(value))
+    // CFGR
+    pub fn read_cfgr(&self) -> Result<RegValue, RccError> {
+        self.read_register(0x08)
     }
     
-    // Write BDCR register
-    pub fn write_bdcr(&self, value: RegValue) -> Result<(), RccError> {
-        if self.register.is_null() {
-            return Err(RccError::HardwareFault);
-        }
-        
-        unsafe {
-            (*self.register).BDCR = value.get();
-        }
-        
-        Ok(())
+    pub fn write_cfgr(&self, value: RegValue) -> Result<(), RccError> {
+        self.write_register(0x08, value)
     }
     
-    // Modify BDCR register
-    pub fn modify_bdcr<F>(&self, f: F) -> Result<(), RccError> 
+    pub fn modify_cfgr<F>(&self, f: F) -> Result<(), RccError> 
     where F: FnOnce(RegValue) -> RegValue {
-        let value: RegValue = self.read_bdcr()?;
-        let new_value: RegValue = f(value);
-        self.write_bdcr(new_value)
+        self.modify_register(0x08, f)
     }
     
-    // Read CSR register
-    pub fn read_csr(&self) -> Result<RegValue, RccError> {
-        if self.register.is_null() {
-            return Err(RccError::HardwareFault);
-        }
-        
-        let value: u32 = unsafe { (*self.register).CSR };
-        Ok(RegValue::new(value))
+    // CIR
+    pub fn read_cir(&self) -> Result<RegValue, RccError> {
+        self.read_register(0x0C)
     }
     
-    // Write CSR register
-    pub fn write_csr(&self, value: RegValue) -> Result<(), RccError> {
-        if self.register.is_null() {
-            return Err(RccError::HardwareFault);
-        }
-        
-        unsafe {
-            (*self.register).CSR = value.get();
-        }
-        
-        Ok(())
+    pub fn write_cir(&self, value: RegValue) -> Result<(), RccError> {
+        self.write_register(0x0C, value)
     }
     
-    // Modify CSR register
-    pub fn modify_csr<F>(&self, f: F) -> Result<(), RccError> 
+    pub fn modify_cir<F>(&self, f: F) -> Result<(), RccError> 
     where F: FnOnce(RegValue) -> RegValue {
-        let value: RegValue = self.read_csr()?;
-        let new_value: RegValue = f(value);
-        self.write_csr(new_value)
+        self.modify_register(0x0C, f)
     }
     
-    // Read AHB1ENR register
+    // AHB1RSTR
+    pub fn read_ahb1rstr(&self) -> Result<RegValue, RccError> {
+        self.read_register(0x10)
+    }
+    
+    pub fn write_ahb1rstr(&self, value: RegValue) -> Result<(), RccError> {
+        self.write_register(0x10, value)
+    }
+    
+    pub fn modify_ahb1rstr<F>(&self, f: F) -> Result<(), RccError> 
+    where F: FnOnce(RegValue) -> RegValue {
+        self.modify_register(0x10, f)
+    }
+    
+    // AHB2RSTR
+    pub fn read_ahb2rstr(&self) -> Result<RegValue, RccError> {
+        self.read_register(0x14)
+    }
+    
+    pub fn write_ahb2rstr(&self, value: RegValue) -> Result<(), RccError> {
+        self.write_register(0x14, value)
+    }
+    
+    pub fn modify_ahb2rstr<F>(&self, f: F) -> Result<(), RccError> 
+    where F: FnOnce(RegValue) -> RegValue {
+        self.modify_register(0x14, f)
+    }
+    
+    // AHB3RSTR
+    pub fn read_ahb3rstr(&self) -> Result<RegValue, RccError> {
+        self.read_register(0x18)
+    }
+    
+    pub fn write_ahb3rstr(&self, value: RegValue) -> Result<(), RccError> {
+        self.write_register(0x18, value)
+    }
+    
+    pub fn modify_ahb3rstr<F>(&self, f: F) -> Result<(), RccError> 
+    where F: FnOnce(RegValue) -> RegValue {
+        self.modify_register(0x18, f)
+    }
+    
+    // APB1RSTR
+    pub fn read_apb1rstr(&self) -> Result<RegValue, RccError> {
+        self.read_register(0x20)
+    }
+    
+    pub fn write_apb1rstr(&self, value: RegValue) -> Result<(), RccError> {
+        self.write_register(0x20, value)
+    }
+    
+    pub fn modify_apb1rstr<F>(&self, f: F) -> Result<(), RccError> 
+    where F: FnOnce(RegValue) -> RegValue {
+        self.modify_register(0x20, f)
+    }
+    
+    // APB2RSTR
+    pub fn read_apb2rstr(&self) -> Result<RegValue, RccError> {
+        self.read_register(0x24)
+    }
+    
+    pub fn write_apb2rstr(&self, value: RegValue) -> Result<(), RccError> {
+        self.write_register(0x24, value)
+    }
+    
+    pub fn modify_apb2rstr<F>(&self, f: F) -> Result<(), RccError> 
+    where F: FnOnce(RegValue) -> RegValue {
+        self.modify_register(0x24, f)
+    }
+    
+    // AHB1ENR
     pub fn read_ahb1enr(&self) -> Result<RegValue, RccError> {
-        if self.register.is_null() {
-            return Err(RccError::HardwareFault);
-        }
-        
-        let value: u32 = unsafe { (*self.register).AHB1ENR };
-        Ok(RegValue::new(value))
+        self.read_register(0x30)
     }
     
-    // Write AHB1ENR register
     pub fn write_ahb1enr(&self, value: RegValue) -> Result<(), RccError> {
-        if self.register.is_null() {
-            return Err(RccError::HardwareFault);
-        }
-        
-        unsafe {
-            (*self.register).AHB1ENR = value.get();
-        }
-        
-        Ok(())
+        self.write_register(0x30, value)
     }
     
-    // Modify AHB1ENR register
     pub fn modify_ahb1enr<F>(&self, f: F) -> Result<(), RccError> 
     where F: FnOnce(RegValue) -> RegValue {
-        let value: RegValue = self.read_ahb1enr()?;
-        let new_value: RegValue = f(value);
-        self.write_ahb1enr(new_value)
+        self.modify_register(0x30, f)
     }
     
-    // Read APB1ENR register
+    // AHB2ENR
+    pub fn read_ahb2enr(&self) -> Result<RegValue, RccError> {
+        self.read_register(0x34)
+    }
+    
+    pub fn write_ahb2enr(&self, value: RegValue) -> Result<(), RccError> {
+        self.write_register(0x34, value)
+    }
+    
+    pub fn modify_ahb2enr<F>(&self, f: F) -> Result<(), RccError> 
+    where F: FnOnce(RegValue) -> RegValue {
+        self.modify_register(0x34, f)
+    }
+    
+    // AHB3ENR
+    pub fn read_ahb3enr(&self) -> Result<RegValue, RccError> {
+        self.read_register(0x38)
+    }
+    
+    pub fn write_ahb3enr(&self, value: RegValue) -> Result<(), RccError> {
+        self.write_register(0x38, value)
+    }
+    
+    pub fn modify_ahb3enr<F>(&self, f: F) -> Result<(), RccError> 
+    where F: FnOnce(RegValue) -> RegValue {
+        self.modify_register(0x38, f)
+    }
+    
+    // APB1ENR
     pub fn read_apb1enr(&self) -> Result<RegValue, RccError> {
-        if self.register.is_null() {
-            return Err(RccError::HardwareFault);
-        }
-        
-        let value: u32 = unsafe { (*self.register).APB1ENR };
-        Ok(RegValue::new(value))
+        self.read_register(0x40)
     }
     
-    // Write APB1ENR register
     pub fn write_apb1enr(&self, value: RegValue) -> Result<(), RccError> {
-        if self.register.is_null() {
-            return Err(RccError::HardwareFault);
-        }
-        
-        unsafe {
-            (*self.register).APB1ENR = value.get();
-        }
-        
-        Ok(())
+        self.write_register(0x40, value)
     }
     
-    // Modify APB1ENR register
     pub fn modify_apb1enr<F>(&self, f: F) -> Result<(), RccError> 
     where F: FnOnce(RegValue) -> RegValue {
-        let value: RegValue = self.read_apb1enr()?;
-        let new_value: RegValue = f(value);
-        self.write_apb1enr(new_value)
+        self.modify_register(0x40, f)
+    }
+    
+    // APB2ENR
+    pub fn read_apb2enr(&self) -> Result<RegValue, RccError> {
+        self.read_register(0x44)
+    }
+    
+    pub fn write_apb2enr(&self, value: RegValue) -> Result<(), RccError> {
+        self.write_register(0x44, value)
+    }
+    
+    pub fn modify_apb2enr<F>(&self, f: F) -> Result<(), RccError> 
+    where F: FnOnce(RegValue) -> RegValue {
+        self.modify_register(0x44, f)
+    }
+    
+    // AHB1LPENR
+    pub fn read_ahb1lpenr(&self) -> Result<RegValue, RccError> {
+        self.read_register(0x50)
+    }
+    
+    pub fn write_ahb1lpenr(&self, value: RegValue) -> Result<(), RccError> {
+        self.write_register(0x50, value)
+    }
+    
+    pub fn modify_ahb1lpenr<F>(&self, f: F) -> Result<(), RccError> 
+    where F: FnOnce(RegValue) -> RegValue {
+        self.modify_register(0x50, f)
+    }
+    
+    // AHB2LPENR
+    pub fn read_ahb2lpenr(&self) -> Result<RegValue, RccError> {
+        self.read_register(0x54)
+    }
+    
+    pub fn write_ahb2lpenr(&self, value: RegValue) -> Result<(), RccError> {
+        self.write_register(0x54, value)
+    }
+    
+    pub fn modify_ahb2lpenr<F>(&self, f: F) -> Result<(), RccError> 
+    where F: FnOnce(RegValue) -> RegValue {
+        self.modify_register(0x54, f)
+    }
+    
+    // AHB3LPENR
+    pub fn read_ahb3lpenr(&self) -> Result<RegValue, RccError> {
+        self.read_register(0x58)
+    }
+    
+    pub fn write_ahb3lpenr(&self, value: RegValue) -> Result<(), RccError> {
+        self.write_register(0x58, value)
+    }
+    
+    pub fn modify_ahb3lpenr<F>(&self, f: F) -> Result<(), RccError> 
+    where F: FnOnce(RegValue) -> RegValue {
+        self.modify_register(0x58, f)
+    }
+    
+    // APB1LPENR
+    pub fn read_apb1lpenr(&self) -> Result<RegValue, RccError> {
+        self.read_register(0x60)
+    }
+    
+    pub fn write_apb1lpenr(&self, value: RegValue) -> Result<(), RccError> {
+        self.write_register(0x60, value)
+    }
+    
+    pub fn modify_apb1lpenr<F>(&self, f: F) -> Result<(), RccError> 
+    where F: FnOnce(RegValue) -> RegValue {
+        self.modify_register(0x60, f)
+    }
+    
+    // APB2LPENR
+    pub fn read_apb2lpenr(&self) -> Result<RegValue, RccError> {
+        self.read_register(0x64)
+    }
+    
+    pub fn write_apb2lpenr(&self, value: RegValue) -> Result<(), RccError> {
+        self.write_register(0x64, value)
+    }
+    
+    pub fn modify_apb2lpenr<F>(&self, f: F) -> Result<(), RccError> 
+    where F: FnOnce(RegValue) -> RegValue {
+        self.modify_register(0x64, f)
+    }
+    
+    // BDCR
+    pub fn read_bdcr(&self) -> Result<RegValue, RccError> {
+        self.read_register(0x70)
+    }
+    
+    pub fn write_bdcr(&self, value: RegValue) -> Result<(), RccError> {
+        self.write_register(0x70, value)
+    }
+    
+    pub fn modify_bdcr<F>(&self, f: F) -> Result<(), RccError> 
+    where F: FnOnce(RegValue) -> RegValue {
+        self.modify_register(0x70, f)
+    }
+    
+    // CSR
+    pub fn read_csr(&self) -> Result<RegValue, RccError> {
+        self.read_register(0x74)
+    }
+    
+    pub fn write_csr(&self, value: RegValue) -> Result<(), RccError> {
+        self.write_register(0x74, value)
+    }
+    
+    pub fn modify_csr<F>(&self, f: F) -> Result<(), RccError> 
+    where F: FnOnce(RegValue) -> RegValue {
+        self.modify_register(0x74, f)
+    }
+    
+    // SSCGR
+    pub fn read_sscgr(&self) -> Result<RegValue, RccError> {
+        self.read_register(0x80)
+    }
+    
+    pub fn write_sscgr(&self, value: RegValue) -> Result<(), RccError> {
+        self.write_register(0x80, value)
+    }
+    
+    pub fn modify_sscgr<F>(&self, f: F) -> Result<(), RccError> 
+    where F: FnOnce(RegValue) -> RegValue {
+        self.modify_register(0x80, f)
+    }
+    
+    // PLLI2SCFGR
+    pub fn read_plli2scfgr(&self) -> Result<RegValue, RccError> {
+        self.read_register(0x84)
+    }
+    
+    pub fn write_plli2scfgr(&self, value: RegValue) -> Result<(), RccError> {
+        self.write_register(0x84, value)
+    }
+    
+    pub fn modify_plli2scfgr<F>(&self, f: F) -> Result<(), RccError> 
+    where F: FnOnce(RegValue) -> RegValue {
+        self.modify_register(0x84, f)
+    }
+    
+    // Helper method to enable/disable a specific peripheral clock
+    pub fn enable_peripheral_clock(&self, bus_type: &str, peripheral_bit: u32, enable: bool) -> Result<(), RccError> {
+        match bus_type {
+            "AHB1" => self.modify_ahb1enr(|mut reg| {
+                if enable {
+                    reg.set_bits(1 << peripheral_bit);
+                } else {
+                    reg.clear_bits(1 << peripheral_bit);
+                }
+                reg
+            }),
+            "AHB2" => self.modify_ahb2enr(|mut reg| {
+                if enable {
+                    reg.set_bits(1 << peripheral_bit);
+                } else {
+                    reg.clear_bits(1 << peripheral_bit);
+                }
+                reg
+            }),
+            "AHB3" => self.modify_ahb3enr(|mut reg| {
+                if enable {
+                    reg.set_bits(1 << peripheral_bit);
+                } else {
+                    reg.clear_bits(1 << peripheral_bit);
+                }
+                reg
+            }),
+            "APB1" => self.modify_apb1enr(|mut reg| {
+                if enable {
+                    reg.set_bits(1 << peripheral_bit);
+                } else {
+                    reg.clear_bits(1 << peripheral_bit);
+                }
+                reg
+            }),
+            "APB2" => self.modify_apb2enr(|mut reg| {
+                if enable {
+                    reg.set_bits(1 << peripheral_bit);
+                } else {
+                    reg.clear_bits(1 << peripheral_bit);
+                }
+                reg
+            }),
+            _ => Err(RccError::InvalidConfiguration),
+        }
+    }
+    
+    // Helper method to reset a specific peripheral
+    pub fn reset_peripheral(&self, bus_type: &str, peripheral_bit: u32) -> Result<(), RccError> {
+        match bus_type {
+            "AHB1" => {
+                self.modify_ahb1rstr(|mut reg| {
+                    reg.set_bits(1 << peripheral_bit);
+                    reg
+                })?;
+                self.modify_ahb1rstr(|mut reg| {
+                    reg.clear_bits(1 << peripheral_bit);
+                    reg
+                })
+            },
+            "AHB2" => {
+                self.modify_ahb2rstr(|mut reg| {
+                    reg.set_bits(1 << peripheral_bit);
+                    reg
+                })?;
+                self.modify_ahb2rstr(|mut reg| {
+                    reg.clear_bits(1 << peripheral_bit);
+                    reg
+                })
+            },
+            "AHB3" => {
+                self.modify_ahb3rstr(|mut reg| {
+                    reg.set_bits(1 << peripheral_bit);
+                    reg
+                })?;
+                self.modify_ahb3rstr(|mut reg| {
+                    reg.clear_bits(1 << peripheral_bit);
+                    reg
+                })
+            },
+            "APB1" => {
+                self.modify_apb1rstr(|mut reg| {
+                    reg.set_bits(1 << peripheral_bit);
+                    reg
+                })?;
+                self.modify_apb1rstr(|mut reg| {
+                    reg.clear_bits(1 << peripheral_bit);
+                    reg
+                })
+            },
+            "APB2" => {
+                self.modify_apb2rstr(|mut reg| {
+                    reg.set_bits(1 << peripheral_bit);
+                    reg
+                })?;
+                self.modify_apb2rstr(|mut reg| {
+                    reg.clear_bits(1 << peripheral_bit);
+                    reg
+                })
+            },
+            _ => Err(RccError::InvalidConfiguration),
+        }
     }
 }
 
@@ -633,7 +926,7 @@ impl<'a> RccHandle<'a> {
                 
                 // Turn on PLL
                 self.rcc_reg.modify_cr(|mut reg: RegValue| {
-                    reg.set_bits(1 << 24);  // Turn on PLL
+                    reg.set_bits(1 << 24);
                     reg
                 })?;
                 
@@ -649,7 +942,7 @@ impl<'a> RccHandle<'a> {
                     timeout -= 1;
                 }
                 
-                if timeout == 0 {
+                if 0 == timeout {
                     return Err(RccError::Timeout);
                 }
             }
@@ -671,14 +964,14 @@ impl<'a> RccHandle<'a> {
         while timeout > 0 {
             let acr_val: RegValue = self.flash_reg.read_acr()?;
             
-            if (acr_val.get() & 0xF) == 0x5 {
+            if 0x5 == (acr_val.get() & 0xF) {
                 break;
             }
             
             timeout -= 1;
         }
         
-        if timeout == 0 {
+        if 0 == timeout {
             return Err(RccError::Timeout);
         }
 
@@ -702,7 +995,7 @@ impl<'a> RccHandle<'a> {
         }
 
         // Configure system clock source
-        if (config.clock_type & (ClockType::SystemClock as u32)) != 0 {
+        if 0 != (config.clock_type & (ClockType::SystemClock as u32)) {
             // Check clock source readiness
             match config.sys_clk_source {
                 SysClkSource::HSE => {
@@ -717,7 +1010,7 @@ impl<'a> RccHandle<'a> {
                         timeout -= 1;
                     }
                     
-                    if timeout == 0 {
+                    if 0 == timeout {
                         return Err(RccError::Timeout);
                     }
                 },
@@ -733,7 +1026,7 @@ impl<'a> RccHandle<'a> {
                         timeout -= 1;
                     }
                     
-                    if timeout == 0 {
+                    if 0 == timeout {
                         return Err(RccError::Timeout);
                     }
                 },
@@ -749,7 +1042,7 @@ impl<'a> RccHandle<'a> {
                         timeout -= 1;
                     }
                     
-                    if timeout == 0 {
+                    if 0 == timeout {
                         return Err(RccError::Timeout);
                     }
                 },
@@ -775,7 +1068,7 @@ impl<'a> RccHandle<'a> {
                 timeout -= 1;
             }
             
-            if timeout == 0 {
+            if 0 == timeout {
                 return Err(RccError::Timeout);
             }
         }
@@ -931,12 +1224,104 @@ impl<'a> RccHandle<'a> {
         Ok(())
     }
     
-    // Added helper methods
-    pub fn enable_tim6_clock(&self) -> Result<(), RccError> {
-        self.rcc_reg.modify_apb1enr(|mut reg: RegValue| {
-            reg.set_bits(1 << 4);
-            reg
-        })
+    // GPIO clock control
+    pub fn gpio_clock_control(&self, gpio_base: u32, enable: bool) -> Result<(), RccError> {
+        use crate::stm32f4xx::{GPIOA_BASE, GPIOB_BASE, GPIOC_BASE, GPIOD_BASE, 
+                              GPIOE_BASE, GPIOF_BASE, GPIOG_BASE, GPIOH_BASE, GPIOI_BASE};
+        
+        let bit_position = match gpio_base {
+            GPIOA_BASE => 0,
+            GPIOB_BASE => 1,
+            GPIOC_BASE => 2,
+            GPIOD_BASE => 3,
+            GPIOE_BASE => 4,
+            GPIOF_BASE => 5,
+            GPIOG_BASE => 6,
+            GPIOH_BASE => 7,
+            GPIOI_BASE => 8,
+            _ => return Err(RccError::InvalidConfiguration),
+        };
+        
+        self.rcc_reg.enable_peripheral_clock("AHB1", bit_position, enable)
+    }
+    
+    // USART clock control
+    pub fn usart_clock_control(&self, usart_base: u32, enable: bool) -> Result<(), RccError> {
+        use crate::stm32f4xx::{USART1_BASE, USART2_BASE, USART3_BASE, UART4_BASE, UART5_BASE, USART6_BASE};
+        
+        match usart_base {
+            USART1_BASE => self.rcc_reg.enable_peripheral_clock("APB2", 4, enable),
+            USART2_BASE => self.rcc_reg.enable_peripheral_clock("APB1", 17, enable),
+            USART3_BASE => self.rcc_reg.enable_peripheral_clock("APB1", 18, enable),
+            UART4_BASE => self.rcc_reg.enable_peripheral_clock("APB1", 19, enable),
+            UART5_BASE => self.rcc_reg.enable_peripheral_clock("APB1", 20, enable),
+            USART6_BASE => self.rcc_reg.enable_peripheral_clock("APB2", 5, enable),
+            _ => Err(RccError::InvalidConfiguration),
+        }
+    }
+    
+    // USART reset control
+    pub fn usart_reset(&self, usart_base: u32) -> Result<(), RccError> {
+        use crate::stm32f4xx::{USART1_BASE, USART2_BASE, USART3_BASE, UART4_BASE, UART5_BASE, USART6_BASE};
+        
+        match usart_base {
+            USART1_BASE => self.rcc_reg.reset_peripheral("APB2", 4),
+            USART2_BASE => self.rcc_reg.reset_peripheral("APB1", 17),
+            USART3_BASE => self.rcc_reg.reset_peripheral("APB1", 18),
+            UART4_BASE => self.rcc_reg.reset_peripheral("APB1", 19),
+            UART5_BASE => self.rcc_reg.reset_peripheral("APB1", 20),
+            USART6_BASE => self.rcc_reg.reset_peripheral("APB2", 5),
+            _ => Err(RccError::InvalidConfiguration),
+        }
+    }
+    
+    // SPI clock control
+    pub fn spi_clock_control(&self, spi_base: u32, enable: bool) -> Result<(), RccError> {
+        use crate::stm32f4xx::{SPI1_BASE, SPI2_BASE, SPI3_BASE};
+        
+        match spi_base {
+            SPI1_BASE => self.rcc_reg.enable_peripheral_clock("APB2", 12, enable),
+            SPI2_BASE => self.rcc_reg.enable_peripheral_clock("APB1", 14, enable),
+            SPI3_BASE => self.rcc_reg.enable_peripheral_clock("APB1", 15, enable),
+            _ => Err(RccError::InvalidConfiguration),
+        }
+    }
+    
+    // I2C clock control
+    pub fn i2c_clock_control(&self, i2c_base: u32, enable: bool) -> Result<(), RccError> {
+        use crate::stm32f4xx::{I2C1_BASE, I2C2_BASE, I2C3_BASE};
+        
+        match i2c_base {
+            I2C1_BASE => self.rcc_reg.enable_peripheral_clock("APB1", 21, enable),
+            I2C2_BASE => self.rcc_reg.enable_peripheral_clock("APB1", 22, enable),
+            I2C3_BASE => self.rcc_reg.enable_peripheral_clock("APB1", 23, enable),
+            _ => Err(RccError::InvalidConfiguration),
+        }
+    }
+    
+    // Timer clock control
+    pub fn timer_clock_control(&self, timer_base: u32, enable: bool) -> Result<(), RccError> {
+        use crate::stm32f4xx::{TIM1_BASE, TIM2_BASE, TIM3_BASE, TIM4_BASE, TIM5_BASE, 
+                              TIM6_BASE, TIM7_BASE, TIM8_BASE, TIM9_BASE, TIM10_BASE,
+                              TIM11_BASE, TIM12_BASE, TIM13_BASE, TIM14_BASE};
+        
+        match timer_base {
+            TIM1_BASE => self.rcc_reg.enable_peripheral_clock("APB2", 0, enable),
+            TIM2_BASE => self.rcc_reg.enable_peripheral_clock("APB1", 0, enable),
+            TIM3_BASE => self.rcc_reg.enable_peripheral_clock("APB1", 1, enable),
+            TIM4_BASE => self.rcc_reg.enable_peripheral_clock("APB1", 2, enable),
+            TIM5_BASE => self.rcc_reg.enable_peripheral_clock("APB1", 3, enable),
+            TIM6_BASE => self.rcc_reg.enable_peripheral_clock("APB1", 4, enable),
+            TIM7_BASE => self.rcc_reg.enable_peripheral_clock("APB1", 5, enable),
+            TIM8_BASE => self.rcc_reg.enable_peripheral_clock("APB2", 1, enable),
+            TIM9_BASE => self.rcc_reg.enable_peripheral_clock("APB2", 16, enable),
+            TIM10_BASE => self.rcc_reg.enable_peripheral_clock("APB2", 17, enable),
+            TIM11_BASE => self.rcc_reg.enable_peripheral_clock("APB2", 18, enable),
+            TIM12_BASE => self.rcc_reg.enable_peripheral_clock("APB1", 6, enable),
+            TIM13_BASE => self.rcc_reg.enable_peripheral_clock("APB1", 7, enable),
+            TIM14_BASE => self.rcc_reg.enable_peripheral_clock("APB1", 8, enable),
+            _ => Err(RccError::InvalidConfiguration),
+        }
     }
 }
 

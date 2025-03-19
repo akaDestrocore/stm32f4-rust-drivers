@@ -1,9 +1,9 @@
 use core::marker::PhantomData;
 use crate::stm32f4xx::{
     USART1, USART2, USART3, UART4, UART5, USART6, 
-    USARTRegDef, RCC
+    USARTRegDef, RegValue
 };
-use crate::stm32f4_rcc::{RegValue};
+use crate::stm32f4_rcc::{RccHandle, RccRegister, RccError};
 
 // Error type for USART operations
 #[derive(Debug, Clone, Copy)]
@@ -12,9 +12,17 @@ pub enum UsartError {
     HardwareFault,
     Timeout,
     InvalidPeripheral,
+    RccError(RccError),
 }
 
-// USART Mode enum
+// Convert RccError to UsartError
+impl From<RccError> for UsartError {
+    fn from(error: RccError) -> Self {
+        UsartError::RccError(error)
+    }
+}
+
+// USART Mode
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum UsartMode {
     TxOnly = 0,
@@ -22,7 +30,7 @@ pub enum UsartMode {
     TxRx   = 2,
 }
 
-// USART Baud Rate enum
+// USART Baudrate
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum UsartBaud {
     Baud1200   = 1200,
@@ -39,37 +47,37 @@ pub enum UsartBaud {
     Baud3M     = 3000000,
 }
 
-// USART Parity enum
+// USART Parity
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum UsartParity {
-    Disable  = 0,
-    EvenParity = 1,
-    OddParity  = 2,
+    Disable     = 0,
+    EvenParity  = 1,
+    OddParity   = 2,
 }
 
-// USART Word Length enum
+// USART Word Length
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum UsartWordLength {
-    Bits8 = 0,
-    Bits9 = 1,
+    WordLengthBits8 = 0,
+    WordLengthBits9 = 1,
 }
 
-// USART Stop Bits enum
+// USART Stop Bits
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum UsartStopBits {
-    Bits1   = 0,
-    Bits0_5 = 1,
-    Bits2   = 2,
-    Bits1_5 = 3,
+    StopBits1   = 0,
+    StopBits0_5 = 1,
+    StopBits2   = 2,
+    StopBits1_5 = 3,
 }
 
-// USART Hardware Flow Control enum
+// USART Hardware Flow Control
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum UsartHwFlowControl {
-    None   = 0,
-    CTS    = 1,
-    RTS    = 2,
-    CtsRts = 3,
+    HwFlowControlNone   = 0,
+    HwFlowControlCTS    = 1,
+    HwFlowControlRTS    = 2,
+    HwFlowControlCtsRts = 3,
 }
 
 // USART Status Register Flags
@@ -113,10 +121,10 @@ pub enum UsartEvent {
 pub struct UsartConfig {
     pub mode: UsartMode,
     pub baud: UsartBaud,
-    pub stop_bits: UsartStopBits,
-    pub word_length: UsartWordLength,
+    pub stopbits: UsartStopBits,
+    pub wordlength: UsartWordLength,
     pub parity: UsartParity,
-    pub hw_flow_control: UsartHwFlowControl,
+    pub hwflowcontrol: UsartHwFlowControl,
 }
 
 impl Default for UsartConfig {
@@ -124,17 +132,17 @@ impl Default for UsartConfig {
         UsartConfig {
             mode: UsartMode::TxRx,
             baud: UsartBaud::Baud115200,
-            stop_bits: UsartStopBits::Bits1,
-            word_length: UsartWordLength::Bits8,
+            stopbits: UsartStopBits::StopBits1,
+            wordlength: UsartWordLength::WordLengthBits8,
             parity: UsartParity::Disable,
-            hw_flow_control: UsartHwFlowControl::None,
+            hwflowcontrol: UsartHwFlowControl::HwFlowControlNone,
         }
     }
 }
 
-// USART Register wrapper
+
 struct UsartRegister {
-    register: *mut USARTRegDef,
+    reg: *mut USARTRegDef,
 }
 
 impl UsartRegister {
@@ -143,33 +151,33 @@ impl UsartRegister {
             return Err(UsartError::InvalidPeripheral);
         }
         
-        Ok(UsartRegister { register: pusartx })
+        Ok(UsartRegister { reg: pusartx })
     }
     
-    // Read SR register
+    // Read SR
     fn read_sr(&self) -> Result<RegValue, UsartError> {
-        if self.register.is_null() {
+        if self.reg.is_null() {
             return Err(UsartError::HardwareFault);
         }
         
-        let value: u32 = unsafe { (*self.register).SR };
+        let value: u32 = unsafe { (*self.reg).SR };
         Ok(RegValue::new(value))
     }
     
-    // Write SR register
+    // Write SR
     fn write_sr(&self, value: RegValue) -> Result<(), UsartError> {
-        if self.register.is_null() {
+        if self.reg.is_null() {
             return Err(UsartError::HardwareFault);
         }
         
         unsafe {
-            (*self.register).SR = value.get();
+            (*self.reg).SR = value.get();
         }
         
         Ok(())
     }
     
-    // Modify SR register
+    // Modify SR
     fn modify_sr<F>(&self, f: F) -> Result<(), UsartError> 
     where F: FnOnce(RegValue) -> RegValue {
         let value: RegValue = self.read_sr()?;
@@ -177,30 +185,30 @@ impl UsartRegister {
         self.write_sr(new_value)
     }
     
-    // Read CR1 register
+    // Read CR1
     fn read_cr1(&self) -> Result<RegValue, UsartError> {
-        if self.register.is_null() {
+        if self.reg.is_null() {
             return Err(UsartError::HardwareFault);
         }
         
-        let value: u32 = unsafe { (*self.register).CR1 };
+        let value: u32 = unsafe { (*self.reg).CR1 };
         Ok(RegValue::new(value))
     }
     
-    // Write CR1 register
+    // Write CR1
     fn write_cr1(&self, value: RegValue) -> Result<(), UsartError> {
-        if self.register.is_null() {
+        if self.reg.is_null() {
             return Err(UsartError::HardwareFault);
         }
         
         unsafe {
-            (*self.register).CR1 = value.get();
+            (*self.reg).CR1 = value.get();
         }
         
         Ok(())
     }
     
-    // Modify CR1 register
+    // Modify CR1
     fn modify_cr1<F>(&self, f: F) -> Result<(), UsartError> 
     where F: FnOnce(RegValue) -> RegValue {
         let value: RegValue = self.read_cr1()?;
@@ -208,30 +216,30 @@ impl UsartRegister {
         self.write_cr1(new_value)
     }
     
-    // Read CR2 register
+    // Read CR2
     fn read_cr2(&self) -> Result<RegValue, UsartError> {
-        if self.register.is_null() {
+        if self.reg.is_null() {
             return Err(UsartError::HardwareFault);
         }
         
-        let value: u32 = unsafe { (*self.register).CR2 };
+        let value: u32 = unsafe { (*self.reg).CR2 };
         Ok(RegValue::new(value))
     }
     
-    // Write CR2 register
+    // Write CR2
     fn write_cr2(&self, value: RegValue) -> Result<(), UsartError> {
-        if self.register.is_null() {
+        if self.reg.is_null() {
             return Err(UsartError::HardwareFault);
         }
         
         unsafe {
-            (*self.register).CR2 = value.get();
+            (*self.reg).CR2 = value.get();
         }
         
         Ok(())
     }
     
-    // Modify CR2 register
+    // Modify CR2
     fn modify_cr2<F>(&self, f: F) -> Result<(), UsartError> 
     where F: FnOnce(RegValue) -> RegValue {
         let value: RegValue = self.read_cr2()?;
@@ -239,30 +247,30 @@ impl UsartRegister {
         self.write_cr2(new_value)
     }
     
-    // Read CR3 register
+    // Read CR3
     fn read_cr3(&self) -> Result<RegValue, UsartError> {
-        if self.register.is_null() {
+        if self.reg.is_null() {
             return Err(UsartError::HardwareFault);
         }
         
-        let value: u32 = unsafe { (*self.register).CR3 };
+        let value: u32 = unsafe { (*self.reg).CR3 };
         Ok(RegValue::new(value))
     }
     
-    // Write CR3 register
+    // Write CR3
     fn write_cr3(&self, value: RegValue) -> Result<(), UsartError> {
-        if self.register.is_null() {
+        if self.reg.is_null() {
             return Err(UsartError::HardwareFault);
         }
         
         unsafe {
-            (*self.register).CR3 = value.get();
+            (*self.reg).CR3 = value.get();
         }
         
         Ok(())
     }
     
-    // Modify CR3 register
+    // Modify CR3
     fn modify_cr3<F>(&self, f: F) -> Result<(), UsartError> 
     where F: FnOnce(RegValue) -> RegValue {
         let value: RegValue = self.read_cr3()?;
@@ -270,30 +278,30 @@ impl UsartRegister {
         self.write_cr3(new_value)
     }
     
-    // Read BRR register
+    // Read BRR
     fn read_brr(&self) -> Result<RegValue, UsartError> {
-        if self.register.is_null() {
+        if self.reg.is_null() {
             return Err(UsartError::HardwareFault);
         }
         
-        let value: u32 = unsafe { (*self.register).BRR };
+        let value: u32 = unsafe { (*self.reg).BRR };
         Ok(RegValue::new(value))
     }
     
-    // Write BRR register
+    // Write BRR
     fn write_brr(&self, value: RegValue) -> Result<(), UsartError> {
-        if self.register.is_null() {
+        if self.reg.is_null() {
             return Err(UsartError::HardwareFault);
         }
         
         unsafe {
-            (*self.register).BRR = value.get();
+            (*self.reg).BRR = value.get();
         }
         
         Ok(())
     }
     
-    // Modify BRR register
+    // Modify BRR
     fn modify_brr<F>(&self, f: F) -> Result<(), UsartError> 
     where F: FnOnce(RegValue) -> RegValue {
         let value: RegValue = self.read_brr()?;
@@ -301,32 +309,32 @@ impl UsartRegister {
         self.write_brr(new_value)
     }
     
-    // Read DR register
+    // Read DR
     fn read_dr(&self) -> Result<RegValue, UsartError> {
-        if self.register.is_null() {
+        if self.reg.is_null() {
             return Err(UsartError::HardwareFault);
         }
         
-        let value: u32 = unsafe { (*self.register).DR };
+        let value: u32 = unsafe { (*self.reg).DR };
         Ok(RegValue::new(value))
     }
     
-    // Write DR register
+    // Write DR
     fn write_dr(&self, value: RegValue) -> Result<(), UsartError> {
-        if self.register.is_null() {
+        if self.reg.is_null() {
             return Err(UsartError::HardwareFault);
         }
         
         unsafe {
-            (*self.register).DR = value.get();
+            (*self.reg).DR = value.get();
         }
         
         Ok(())
     }
     
-    // Get raw register pointer for operations that need direct access
+    // for operations that need direct access
     fn get_raw_ptr(&self) -> *mut USARTRegDef {
-        self.register
+        self.reg
     }
 }
 
@@ -334,7 +342,7 @@ impl UsartRegister {
 pub struct UsartHandle<'a> {
     pub pusartx: *mut USARTRegDef,
     pub config: UsartConfig,
-    register: UsartRegister,
+    reg: UsartRegister,
     tx_buffer: Option<&'a [u8]>,
     rx_buffer: Option<&'a mut [u8]>,
     tx_len: usize,
@@ -346,12 +354,12 @@ pub struct UsartHandle<'a> {
 
 impl<'a> UsartHandle<'a> {
     pub fn new(pusartx: *mut USARTRegDef) -> Result<Self, UsartError> {
-        let register: UsartRegister = UsartRegister::new(pusartx)?;
+        let reg: UsartRegister = UsartRegister::new(pusartx)?;
         
         Ok(UsartHandle {
             pusartx,
             config: UsartConfig::default(),
-            register,
+            reg,
             tx_buffer: None,
             rx_buffer: None,
             tx_len: 0,
@@ -373,21 +381,24 @@ impl<'a> UsartHandle<'a> {
     ) -> Result<(), UsartError> {
         self.config.mode = mode;
         self.config.baud = baud;
-        self.config.stop_bits = stop_bits;
-        self.config.word_length = word_length;
+        self.config.stopbits = stop_bits;
+        self.config.wordlength = word_length;
         self.config.parity = parity;
-        self.config.hw_flow_control = hw_flow_control;
+        self.config.hwflowcontrol = hw_flow_control;
         
         Ok(())
     }
     
     pub fn init(&self) -> Result<(), UsartError> {
-        // Enable USART clock
-        Usart::periph_clock_control(self.pusartx, true)?;
+        // Get RCC handle
+        let rcc_handle = RccHandle::new()?;
         
-        // Configure CR1 register
-        self.register.modify_cr1(|mut reg: RegValue| {
-            // Configure USART mode (TX, RX, or both)
+        // Enable USART clock
+        rcc_handle.usart_clock_control(self.pusartx as u32, true)?;
+        
+        // Configure CR1
+        self.reg.modify_cr1(|mut reg: RegValue| {
+            // Configure USART
             match self.config.mode {
                 UsartMode::RxOnly => {
                     reg.set_bits(1 << 2);     // RE bit
@@ -402,7 +413,7 @@ impl<'a> UsartHandle<'a> {
             }
             
             // Configure word length
-            if self.config.word_length == UsartWordLength::Bits9 {
+            if self.config.wordlength == UsartWordLength::WordLengthBits9 {
                 reg.set_bits(1 << 12);     // M bit
             } else {
                 reg.clear_bits(1 << 12);   // 8 bits
@@ -426,27 +437,27 @@ impl<'a> UsartHandle<'a> {
             reg
         })?;
         
-        // Configure CR2 register for stop bits
-        self.register.modify_cr2(|mut reg: RegValue| {
-            reg.clear_bits(0x3 << 12);        // Clear STOP bits
-            reg.set_bits((self.config.stop_bits as u32) << 12);  // Set new STOP bits
+        // Configure CR2
+        self.reg.modify_cr2(|mut reg: RegValue| {
+            reg.clear_bits(0x3 << 12);
+            reg.set_bits((self.config.stopbits as u32) << 12);  // Set new STOP bits
             reg
         })?;
         
-        // Configure CR3 register for hardware flow control
-        self.register.modify_cr3(|mut reg: RegValue| {
-            match self.config.hw_flow_control {
-                UsartHwFlowControl::CTS => {
+        // Configure CR3
+        self.reg.modify_cr3(|mut reg: RegValue| {
+            match self.config.hwflowcontrol {
+                UsartHwFlowControl::HwFlowControlCTS => {
                     reg.set_bits(1 << 9);     // CTSE bit
                 },
-                UsartHwFlowControl::RTS => {
+                UsartHwFlowControl::HwFlowControlRTS => {
                     reg.set_bits(1 << 8);     // RTSE bit
                 },
-                UsartHwFlowControl::CtsRts => {
+                UsartHwFlowControl::HwFlowControlCtsRts => {
                     reg.set_bits(1 << 9);     // CTSE bit
                     reg.set_bits(1 << 8);     // RTSE bit
                 },
-                UsartHwFlowControl::None => {
+                UsartHwFlowControl::HwFlowControlNone => {
                     reg.clear_bits(1 << 9);   // CTSE bit
                     reg.clear_bits(1 << 8);   // RTSE bit
                 },
@@ -455,10 +466,10 @@ impl<'a> UsartHandle<'a> {
         })?;
         
         // Set baud rate
-        self.set_baud_rate(self.config.baud)?;
+        self.set_baudrate(self.config.baud)?;
         
         // Enable USART
-        self.register.modify_cr1(|mut reg: RegValue| {
+        self.reg.modify_cr1(|mut reg: RegValue| {
             reg.set_bits(1 << 13);    // UE bit
             reg
         })?;
@@ -468,91 +479,38 @@ impl<'a> UsartHandle<'a> {
     
     pub fn deinit(&self) -> Result<(), UsartError> {
         // Disable USART
-        self.register.modify_cr1(|mut reg: RegValue| {
+        self.reg.modify_cr1(|mut reg: RegValue| {
             reg.clear_bits(1 << 13);    // UE bit
             reg
         })?;
         
-        // Reset USART peripheral using RCC
-        struct RccRegister;
-        
-        impl RccRegister {
-            fn modify_apb1rstr<F>(f: F) -> Result<(), UsartError> 
-            where F: FnOnce(u32) -> u32 {
-                unsafe {
-                    if RCC.is_null() {
-                        return Err(UsartError::HardwareFault);
-                    }
-                    
-                    let current: u32 = (*RCC).APB1RSTR;
-                    (*RCC).APB1RSTR = f(current);
-                }
-                Ok(())
-            }
-            
-            fn modify_apb2rstr<F>(f: F) -> Result<(), UsartError> 
-            where F: FnOnce(u32) -> u32 {
-                unsafe {
-                    if RCC.is_null() {
-                        return Err(UsartError::HardwareFault);
-                    }
-                    
-                    let current: u32 = (*RCC).APB2RSTR;
-                    (*RCC).APB2RSTR = f(current);
-                }
-                Ok(())
-            }
-        }
-        
-        if self.pusartx == USART1 {
-            RccRegister::modify_apb2rstr(|reg: u32| reg | (1 << 4))?;
-            RccRegister::modify_apb2rstr(|reg: u32| reg & !(1 << 4))?;
-        } else if self.pusartx == USART2 {
-            RccRegister::modify_apb1rstr(|reg: u32| reg | (1 << 17))?;
-            RccRegister::modify_apb1rstr(|reg: u32| reg & !(1 << 17))?;
-        } else if self.pusartx == USART3 {
-            RccRegister::modify_apb1rstr(|reg: u32| reg | (1 << 18))?;
-            RccRegister::modify_apb1rstr(|reg: u32| reg & !(1 << 18))?;
-        } else if self.pusartx == UART4 {
-            RccRegister::modify_apb1rstr(|reg: u32| reg | (1 << 19))?;
-            RccRegister::modify_apb1rstr(|reg: u32| reg & !(1 << 19))?;
-        } else if self.pusartx == UART5 {
-            RccRegister::modify_apb1rstr(|reg: u32| reg | (1 << 20))?;
-            RccRegister::modify_apb1rstr(|reg: u32| reg & !(1 << 20))?;
-        } else if self.pusartx == USART6 {
-            RccRegister::modify_apb2rstr(|reg: u32| reg | (1 << 5))?;
-            RccRegister::modify_apb2rstr(|reg: u32| reg & !(1 << 5))?;
-        } else {
-            return Err(UsartError::InvalidPeripheral);
-        }
+        let rcc_handle = RccHandle::new()?;
+        rcc_handle.usart_reset(self.pusartx as u32)?;
         
         Ok(())
     }
-    
-    pub fn set_baud_rate(&self, baud: UsartBaud) -> Result<(), UsartError> {
-        use crate::stm32f4_rcc::{RccHandle};
-        
+
+    pub fn set_baudrate(&self, baud: UsartBaud) -> Result<(), UsartError> {
         let rcc_handle = RccHandle::new()?;
-        
-        // Get the appropriate peripheral clock
+
         let pclk: u32 = if self.pusartx == USART1 || self.pusartx == USART6 {
-            rcc_handle.get_pclk2_freq()  // USART1 and USART6 are on APB2
+            rcc_handle.get_pclk2_freq() // USART1 and USART6 are on APB2
         } else {
-            rcc_handle.get_pclk1_freq()  // Other USARTs are on APB1
+            rcc_handle.get_pclk1_freq() // Other USART are on APB1
         };
-        
+
         // Calculate USARTDIV
         let mut usartdiv: u32 = 0;
         let over8: bool = unsafe { ((*self.pusartx).CR1 & (1 << 15)) != 0 };
-        
+
         if over8 {
             // Oversampling by 8
-            usartdiv = ((25 * pclk) / (2 * baud as u32));
+            usartdiv = ((pclk * 25) / (2 * baud as u32));
         } else {
             // Oversampling by 16
-            usartdiv = ((25 * pclk) / (4 * baud as u32));
+            usartdiv = ((pclk * 25) / (4 * baud as u32));
         }
-        
+
         // Calculate mantissa and fraction parts
         let mantissa: u32 = usartdiv / 100;
         let fraction: u32 = usartdiv - (mantissa * 100);
@@ -562,17 +520,17 @@ impl<'a> UsartHandle<'a> {
             ((fraction * 16) + 50) / 100 & 0x0F
         };
         
-        // Write to BRR register
+        // Write to BRR
         let brr_value: u32 = (mantissa << 4) | final_fraction;
-        self.register.write_brr(RegValue::new(brr_value))?;
-        
+        self.reg.write_brr(RegValue::new(brr_value))?;
+
         Ok(())
     }
-    
+
     pub fn get_flag_status(&self, flag: UsartStatusFlag) -> Result<bool, UsartError> {
-        let sr_value: RegValue = self.register.read_sr()?;
-        
-        let bit_position: u32 = match flag {
+        let sr_value: RegValue = self.reg.read_sr()?;
+    
+        let bit_pos: u32 = match flag {
             UsartStatusFlag::PE   => 0,
             UsartStatusFlag::FE   => 1,
             UsartStatusFlag::NF   => 2,
@@ -584,10 +542,10 @@ impl<'a> UsartHandle<'a> {
             UsartStatusFlag::LBD  => 8,
             UsartStatusFlag::CTS  => 9,
         };
-        
-        Ok((sr_value.get() & (1 << bit_position)) != 0)
+
+        Ok((sr_value.get() & (1 << bit_pos)) != 0)
     }
-    
+
     pub fn clear_flag(&self, flag: UsartStatusFlag) -> Result<(), UsartError> {
         let bit_position: u32 = match flag {
             UsartStatusFlag::PE   => 0,
@@ -602,7 +560,7 @@ impl<'a> UsartHandle<'a> {
             UsartStatusFlag::CTS  => 9,
         };
         
-        self.register.modify_sr(|mut reg: RegValue| {
+        self.reg.modify_sr(|mut reg: RegValue| {
             reg.clear_bits(1 << bit_position);
             reg
         })?;
@@ -612,31 +570,28 @@ impl<'a> UsartHandle<'a> {
     
     pub fn send_data(&self, tx_buffer: &[u8]) -> Result<(), UsartError> {
         for &byte in tx_buffer {
-            // Wait until TXE flag is set
+            // Wait until TXE
             while !self.get_flag_status(UsartStatusFlag::TXE)? {
-                // Wait
+                // TODO: Timeout may be implemented
             }
             
             // Handle 9-bit data if needed
-            if self.config.word_length == UsartWordLength::Bits9 {
+            if self.config.wordlength == UsartWordLength::WordLengthBits8 {
                 if self.config.parity == UsartParity::Disable {
-                    // 9 bits of data, no parity
-                    // Need to handle 9-bit data here, but in Rust we're dealing with bytes
-                    // This would need a more complex implementation for 9-bit data
-                    self.register.write_dr(RegValue::new(byte as u32))?;
+                    // TODO: 9bit data handling may need a more complex approach
+                    self.reg.write_dr(RegValue::new(byte as u32))?;
                 } else {
-                    // 8 bits of data + 1 parity bit (handled by hardware)
-                    self.register.write_dr(RegValue::new(byte as u32))?;
+                    self.reg.write_dr(RegValue::new(byte as u32))?;
                 }
             } else {
                 // 8-bit data
-                self.register.write_dr(RegValue::new(byte as u32))?;
+                self.reg.write_dr(RegValue::new(byte as u32))?;
             }
         }
         
-        // Wait until TC flag is set before returning
+        // Wait until TC
         while !self.get_flag_status(UsartStatusFlag::TC)? {
-            // Wait
+            // TODO: Timeout may be implemented
         }
         
         Ok(())
@@ -644,31 +599,29 @@ impl<'a> UsartHandle<'a> {
     
     pub fn receive_data(&self, rx_buffer: &mut [u8], len: usize) -> Result<(), UsartError> {
         for i in 0..len.min(rx_buffer.len()) {
-            // Wait until RXNE flag is set
+            // Wait until RXNE
             while !self.get_flag_status(UsartStatusFlag::RXNE)? {
-                // Wait
+                // TODO: Timeout may be implemented
             }
             
-            if self.config.word_length == UsartWordLength::Bits9 {
+            if self.config.wordlength == UsartWordLength::WordLengthBits8 {
                 if self.config.parity == UsartParity::Disable {
-                    // 9 bits of data, no parity
-                    // This is a simplification - 9-bit data would need more complex handling
-                    let dr_value = self.register.read_dr()?.get();
+                    // TODO: 9-bit data would need more complex handling
+                    let dr_value = self.reg.read_dr()?.get();
                     rx_buffer[i] = (dr_value & 0xFF) as u8;
                 } else {
-                    // 8 bits of data + 1 parity bit (handled by hardware)
-                    let dr_value = self.register.read_dr()?.get();
+                    let dr_value = self.reg.read_dr()?.get();
                     rx_buffer[i] = (dr_value & 0xFF) as u8;
                 }
             } else {
-                // 8-bit data
+                // 8-bit word length
                 if self.config.parity == UsartParity::Disable {
                     // 8 bits of data
-                    let dr_value = self.register.read_dr()?.get();
+                    let dr_value = self.reg.read_dr()?.get();
                     rx_buffer[i] = (dr_value & 0xFF) as u8;
                 } else {
                     // 7 bits of data + 1 parity bit
-                    let dr_value = self.register.read_dr()?.get();
+                    let dr_value = self.reg.read_dr()?.get();
                     rx_buffer[i] = (dr_value & 0x7F) as u8;
                 }
             }
@@ -685,15 +638,15 @@ impl<'a> UsartHandle<'a> {
             self.tx_len = tx_buffer.len();
             self.tx_state = UsartState::BusyInTx;
             
-            // Enable TXE interrupt
-            self.register.modify_cr1(|mut reg: RegValue| {
-                reg.set_bits(1 << 7);  // TXEIE bit
+            // TXEIE bit
+            self.reg.modify_cr1(|mut reg: RegValue| {
+                reg.set_bits(1 << 7);
                 reg
             })?;
             
-            // Enable TC interrupt
-            self.register.modify_cr1(|mut reg: RegValue| {
-                reg.set_bits(1 << 6);  // TCIE bit
+            // TCIE bit
+            self.reg.modify_cr1(|mut reg: RegValue| {
+                reg.set_bits(1 << 6);
                 reg
             })?;
         }
@@ -705,16 +658,20 @@ impl<'a> UsartHandle<'a> {
         let rx_state = self.rx_state;
         
         if rx_state != UsartState::BusyInRx {
+            // Get the buffer length
+            let buffer_len = rx_buffer.len();
+            // Calculate rx_len
+            self.rx_len = len.min(buffer_len);
+            // Now store the buffer
             self.rx_buffer = Some(rx_buffer);
-            self.rx_len = len.min(rx_buffer.len());
             self.rx_state = UsartState::BusyInRx;
             
-            // Dummy read of DR to clear any pending RXNE flag
-            let _ = self.register.read_dr()?;
+            // Dummy read DR
+            let _ = self.reg.read_dr()?;
             
-            // Enable RXNE interrupt
-            self.register.modify_cr1(|mut reg: RegValue| {
-                reg.set_bits(1 << 5);  // RXNEIE bit
+            // RXNEIE bit
+            self.reg.modify_cr1(|mut reg: RegValue| {
+                reg.set_bits(1 << 5);
                 reg
             })?;
         }
@@ -723,18 +680,17 @@ impl<'a> UsartHandle<'a> {
     }
     
     pub fn irq_handler(&mut self) -> Result<(), UsartError> {
-        // Check for TC flag
+        // Check for TC
         let tc_flag: bool = self.get_flag_status(UsartStatusFlag::TC)?;
-        let tcie_flag: bool = unsafe { ((*self.pusartx).CR1 & (1 << 6)) != 0 };
+        let tcie_flag: bool = unsafe { 0 != ((*self.pusartx).CR1 & (1 << 6)) };
         
         if tc_flag && tcie_flag {
-            // TC interrupt handling
-            if self.tx_state == UsartState::BusyInTx && self.tx_len == 0 {
+            if self.tx_state == UsartState::BusyInTx && 0 == self.tx_len {
                 // Clear TC flag
                 self.clear_flag(UsartStatusFlag::TC)?;
                 
                 // Disable TCIE
-                self.register.modify_cr1(|mut reg: RegValue| {
+                self.reg.modify_cr1(|mut reg: RegValue| {
                     reg.clear_bits(1 << 6);  // TCIE bit
                     reg
                 })?;
@@ -760,7 +716,7 @@ impl<'a> UsartHandle<'a> {
                         let index = buffer.len() - self.tx_len;
                         
                         // Send data byte
-                        self.register.write_dr(RegValue::new(buffer[index] as u32))?;
+                        self.reg.write_dr(RegValue::new(buffer[index] as u32))?;
                         
                         // Decrement TX length
                         self.tx_len -= 1;
@@ -768,9 +724,9 @@ impl<'a> UsartHandle<'a> {
                 }
                 
                 if self.tx_len == 0 {
-                    // Disable TXEIE
-                    self.register.modify_cr1(|mut reg: RegValue| {
-                        reg.clear_bits(1 << 7);  // TXEIE bit
+                    // TXEIE bit
+                    self.reg.modify_cr1(|mut reg: RegValue| {
+                        reg.clear_bits(1 << 7);
                         reg
                     })?;
                 }
@@ -779,7 +735,7 @@ impl<'a> UsartHandle<'a> {
         
         // Check for RXNE flag
         let rxne_flag: bool = self.get_flag_status(UsartStatusFlag::RXNE)?;
-        let rxneie_flag: bool = unsafe { ((*self.pusartx).CR1 & (1 << 5)) != 0 };
+        let rxneie_flag: bool = unsafe { 0 != ((*self.pusartx).CR1 & (1 << 5)) };
         
         if rxne_flag && rxneie_flag {
             // RXNE interrupt handling
@@ -787,25 +743,25 @@ impl<'a> UsartHandle<'a> {
                 if let Some(buffer) = &mut self.rx_buffer {
                     let index = buffer.len() - self.rx_len;
                     
-                    if self.config.word_length == UsartWordLength::Bits9 {
+                    if self.config.wordlength == UsartWordLength::WordLengthBits9 {
                         if self.config.parity == UsartParity::Disable {
                             // 9 bits, no parity
-                            let dr_value = self.register.read_dr()?.get();
+                            let dr_value = self.reg.read_dr()?.get();
                             buffer[index] = (dr_value & 0xFF) as u8;
                         } else {
                             // 8 bits + parity
-                            let dr_value = self.register.read_dr()?.get();
+                            let dr_value = self.reg.read_dr()?.get();
                             buffer[index] = (dr_value & 0xFF) as u8;
                         }
                     } else {
                         // 8-bit word length
                         if self.config.parity == UsartParity::Disable {
                             // 8 bits, no parity
-                            let dr_value = self.register.read_dr()?.get();
+                            let dr_value = self.reg.read_dr()?.get();
                             buffer[index] = (dr_value & 0xFF) as u8;
                         } else {
                             // 7 bits + parity
-                            let dr_value = self.register.read_dr()?.get();
+                            let dr_value = self.reg.read_dr()?.get();
                             buffer[index] = (dr_value & 0x7F) as u8;
                         }
                     }
@@ -815,8 +771,8 @@ impl<'a> UsartHandle<'a> {
                     
                     if self.rx_len == 0 {
                         // Disable RXNEIE
-                        self.register.modify_cr1(|mut reg: RegValue| {
-                            reg.clear_bits(1 << 5);  // RXNEIE bit
+                        self.reg.modify_cr1(|mut reg: RegValue| {
+                            reg.clear_bits(1 << 5);
                             reg
                         })?;
                         
@@ -830,7 +786,7 @@ impl<'a> UsartHandle<'a> {
             }
         }
         
-        // Check for CTS flag (if HW flow control is enabled)
+        // Check for CTS flag
         let cts_flag: bool = self.get_flag_status(UsartStatusFlag::CTS)?;
         let ctse_flag: bool = unsafe { ((*self.pusartx).CR3 & (1 << 9)) != 0 };
         let ctsie_flag: bool = unsafe { ((*self.pusartx).CR3 & (1 << 10)) != 0 };
@@ -849,8 +805,8 @@ impl<'a> UsartHandle<'a> {
         
         if idle_flag && idleie_flag {
             // Clear IDLE flag - requires reading SR then DR
-            let _ = self.register.read_sr()?;
-            let _ = self.register.read_dr()?;
+            let _ = self.reg.read_sr()?;
+            let _ = self.reg.read_dr()?;
             
             // Call application callback if needed
             Usart::application_event_callback(self.pusartx, UsartEvent::Idle);
@@ -873,99 +829,16 @@ pub struct Usart;
 
 impl Usart {
     pub fn periph_clock_control(pusartx: *mut USARTRegDef, state: bool) -> Result<(), UsartError> {
-        struct RccRegister;
-        
-        impl RccRegister {
-            fn modify_apb1enr<F>(f: F) -> Result<(), UsartError> 
-            where F: FnOnce(u32) -> u32 {
-                unsafe {
-                    if RCC.is_null() {
-                        return Err(UsartError::HardwareFault);
-                    }
-                    
-                    let current: u32 = (*RCC).APB1ENR;
-                    (*RCC).APB1ENR = f(current);
-                }
-                Ok(())
-            }
-            
-            fn modify_apb2enr<F>(f: F) -> Result<(), UsartError> 
-            where F: FnOnce(u32) -> u32 {
-                unsafe {
-                    if RCC.is_null() {
-                        return Err(UsartError::HardwareFault);
-                    }
-                    
-                    let current: u32 = (*RCC).APB2ENR;
-                    (*RCC).APB2ENR = f(current);
-                }
-                Ok(())
-            }
-        }
-        
-        let state_bit: u32 = if state { 1 } else { 0 };
-        
-        if pusartx == USART1 {
-            RccRegister::modify_apb2enr(|reg: u32| {
-                if state {
-                    reg | (1 << 4)
-                } else {
-                    reg & !(1 << 4)
-                }
-            })?;
-        } else if pusartx == USART2 {
-            RccRegister::modify_apb1enr(|reg: u32| {
-                if state {
-                    reg | (1 << 17)
-                } else {
-                    reg & !(1 << 17)
-                }
-            })?;
-        } else if pusartx == USART3 {
-            RccRegister::modify_apb1enr(|reg: u32| {
-                if state {
-                    reg | (1 << 18)
-                } else {
-                    reg & !(1 << 18)
-                }
-            })?;
-        } else if pusartx == UART4 {
-            RccRegister::modify_apb1enr(|reg: u32| {
-                if state {
-                    reg | (1 << 19)
-                } else {
-                    reg & !(1 << 19)
-                }
-            })?;
-        } else if pusartx == UART5 {
-            RccRegister::modify_apb1enr(|reg: u32| {
-                if state {
-                    reg | (1 << 20)
-                } else {
-                    reg & !(1 << 20)
-                }
-            })?;
-        } else if pusartx == USART6 {
-            RccRegister::modify_apb2enr(|reg: u32| {
-                if state {
-                    reg | (1 << 5)
-                } else {
-                    reg & !(1 << 5)
-                }
-            })?;
-        } else {
-            return Err(UsartError::InvalidPeripheral);
-        }
-        
+        let rcc_handle = RccHandle::new()?;
+        rcc_handle.usart_clock_control(pusartx as u32, state)?;
         Ok(())
     }
 
     pub fn application_event_callback(_pusartx: *mut USARTRegDef, _event: UsartEvent) {
-        // This is a weak implementation that should be overridden by the application
+        //TODO: this is weak
     }
 }
 
-// Helper function to initialize USART
 pub fn init_usart(
     pusartx: *mut USARTRegDef,
     mode: UsartMode,
@@ -974,7 +847,8 @@ pub fn init_usart(
     word_length: UsartWordLength,
     parity: UsartParity,
     hw_flow_control: UsartHwFlowControl,
-) -> Result<UsartHandle<'static>, UsartError> {
+) -> Result<UsartHandle<'static>, UsartError> 
+{
     let mut handle: UsartHandle<'_> = UsartHandle::new(pusartx)?;
     handle.config_usart(mode, baud, stop_bits, word_length, parity, hw_flow_control)?;
     handle.init()?;
