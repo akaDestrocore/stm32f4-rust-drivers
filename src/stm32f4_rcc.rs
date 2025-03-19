@@ -311,8 +311,8 @@ impl RccRegister {
     // Helper method to modify any register
     fn modify_register<F>(&self, offset: usize, f: F) -> Result<(), RccError> 
     where F: FnOnce(RegValue) -> RegValue {
-        let value = self.read_register(offset)?;
-        let new_value = f(value);
+        let value: RegValue = self.read_register(offset)?;
+        let new_value: RegValue = f(value);
         self.write_register(offset, new_value)
     }
     
@@ -641,7 +641,7 @@ impl RccRegister {
     // Helper method to enable/disable a specific peripheral clock
     pub fn enable_peripheral_clock(&self, bus_type: &str, peripheral_bit: u32, enable: bool) -> Result<(), RccError> {
         match bus_type {
-            "AHB1" => self.modify_ahb1enr(|mut reg| {
+            "AHB1" => self.modify_ahb1enr(|mut reg: RegValue| {
                 if enable {
                     reg.set_bits(1 << peripheral_bit);
                 } else {
@@ -649,7 +649,7 @@ impl RccRegister {
                 }
                 reg
             }),
-            "AHB2" => self.modify_ahb2enr(|mut reg| {
+            "AHB2" => self.modify_ahb2enr(|mut reg: RegValue| {
                 if enable {
                     reg.set_bits(1 << peripheral_bit);
                 } else {
@@ -657,7 +657,7 @@ impl RccRegister {
                 }
                 reg
             }),
-            "AHB3" => self.modify_ahb3enr(|mut reg| {
+            "AHB3" => self.modify_ahb3enr(|mut reg: RegValue| {
                 if enable {
                     reg.set_bits(1 << peripheral_bit);
                 } else {
@@ -665,7 +665,7 @@ impl RccRegister {
                 }
                 reg
             }),
-            "APB1" => self.modify_apb1enr(|mut reg| {
+            "APB1" => self.modify_apb1enr(|mut reg: RegValue| {
                 if enable {
                     reg.set_bits(1 << peripheral_bit);
                 } else {
@@ -673,7 +673,7 @@ impl RccRegister {
                 }
                 reg
             }),
-            "APB2" => self.modify_apb2enr(|mut reg| {
+            "APB2" => self.modify_apb2enr(|mut reg: RegValue| {
                 if enable {
                     reg.set_bits(1 << peripheral_bit);
                 } else {
@@ -689,51 +689,51 @@ impl RccRegister {
     pub fn reset_peripheral(&self, bus_type: &str, peripheral_bit: u32) -> Result<(), RccError> {
         match bus_type {
             "AHB1" => {
-                self.modify_ahb1rstr(|mut reg| {
+                self.modify_ahb1rstr(|mut reg: RegValue| {
                     reg.set_bits(1 << peripheral_bit);
                     reg
                 })?;
-                self.modify_ahb1rstr(|mut reg| {
+                self.modify_ahb1rstr(|mut reg: RegValue| {
                     reg.clear_bits(1 << peripheral_bit);
                     reg
                 })
             },
             "AHB2" => {
-                self.modify_ahb2rstr(|mut reg| {
+                self.modify_ahb2rstr(|mut reg: RegValue| {
                     reg.set_bits(1 << peripheral_bit);
                     reg
                 })?;
-                self.modify_ahb2rstr(|mut reg| {
+                self.modify_ahb2rstr(|mut reg: RegValue| {
                     reg.clear_bits(1 << peripheral_bit);
                     reg
                 })
             },
             "AHB3" => {
-                self.modify_ahb3rstr(|mut reg| {
+                self.modify_ahb3rstr(|mut reg: RegValue| {
                     reg.set_bits(1 << peripheral_bit);
                     reg
                 })?;
-                self.modify_ahb3rstr(|mut reg| {
+                self.modify_ahb3rstr(|mut reg: RegValue| {
                     reg.clear_bits(1 << peripheral_bit);
                     reg
                 })
             },
             "APB1" => {
-                self.modify_apb1rstr(|mut reg| {
+                self.modify_apb1rstr(|mut reg: RegValue| {
                     reg.set_bits(1 << peripheral_bit);
                     reg
                 })?;
-                self.modify_apb1rstr(|mut reg| {
+                self.modify_apb1rstr(|mut reg: RegValue| {
                     reg.clear_bits(1 << peripheral_bit);
                     reg
                 })
             },
             "APB2" => {
-                self.modify_apb2rstr(|mut reg| {
+                self.modify_apb2rstr(|mut reg: RegValue| {
                     reg.set_bits(1 << peripheral_bit);
                     reg
                 })?;
-                self.modify_apb2rstr(|mut reg| {
+                self.modify_apb2rstr(|mut reg: RegValue| {
                     reg.clear_bits(1 << peripheral_bit);
                     reg
                 })
@@ -888,7 +888,7 @@ impl<'a> RccHandle<'a> {
                     })?;
                 },
                 LsiState::Off => {
-                    self.rcc_reg.modify_csr(|mut reg| {
+                    self.rcc_reg.modify_csr(|mut reg: RegValue| {
                         reg.clear_bits(1 << 0);  // Turn off LSI
                         reg
                     })?;
@@ -933,7 +933,7 @@ impl<'a> RccHandle<'a> {
                 // Wait for PLL to stabilize
                 let mut timeout: i32 = 2000;
                 while timeout > 0 {
-                    let cr_val = self.rcc_reg.read_cr()?;
+                    let cr_val: RegValue = self.rcc_reg.read_cr()?;
                     
                     if (cr_val.get() & (1 << 25)) != 0 {
                         break;
@@ -1229,7 +1229,7 @@ impl<'a> RccHandle<'a> {
         use crate::stm32f4xx::{GPIOA_BASE, GPIOB_BASE, GPIOC_BASE, GPIOD_BASE, 
                               GPIOE_BASE, GPIOF_BASE, GPIOG_BASE, GPIOH_BASE, GPIOI_BASE};
         
-        let bit_position = match gpio_base {
+        let bit_position: u32 = match gpio_base {
             GPIOA_BASE => 0,
             GPIOB_BASE => 1,
             GPIOC_BASE => 2,

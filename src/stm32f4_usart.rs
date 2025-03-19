@@ -391,7 +391,7 @@ impl<'a> UsartHandle<'a> {
     
     pub fn init(&self) -> Result<(), UsartError> {
         // Get RCC handle
-        let rcc_handle = RccHandle::new()?;
+        let rcc_handle: RccHandle<'_> = RccHandle::new()?;
         
         // Enable USART clock
         rcc_handle.usart_clock_control(self.pusartx as u32, true)?;
@@ -484,14 +484,14 @@ impl<'a> UsartHandle<'a> {
             reg
         })?;
         
-        let rcc_handle = RccHandle::new()?;
+        let rcc_handle: RccHandle<'_> = RccHandle::new()?;
         rcc_handle.usart_reset(self.pusartx as u32)?;
         
         Ok(())
     }
 
     pub fn set_baudrate(&self, baud: UsartBaud) -> Result<(), UsartError> {
-        let rcc_handle = RccHandle::new()?;
+        let rcc_handle: RccHandle<'_> = RccHandle::new()?;
 
         let pclk: u32 = if self.pusartx == USART1 || self.pusartx == USART6 {
             rcc_handle.get_pclk2_freq() // USART1 and USART6 are on APB2
@@ -607,21 +607,21 @@ impl<'a> UsartHandle<'a> {
             if self.config.wordlength == UsartWordLength::WordLengthBits8 {
                 if self.config.parity == UsartParity::Disable {
                     // TODO: 9-bit data would need more complex handling
-                    let dr_value = self.reg.read_dr()?.get();
+                    let dr_value: u32 = self.reg.read_dr()?.get();
                     rx_buffer[i] = (dr_value & 0xFF) as u8;
                 } else {
-                    let dr_value = self.reg.read_dr()?.get();
+                    let dr_value: u32 = self.reg.read_dr()?.get();
                     rx_buffer[i] = (dr_value & 0xFF) as u8;
                 }
             } else {
                 // 8-bit word length
                 if self.config.parity == UsartParity::Disable {
                     // 8 bits of data
-                    let dr_value = self.reg.read_dr()?.get();
+                    let dr_value: u32 = self.reg.read_dr()?.get();
                     rx_buffer[i] = (dr_value & 0xFF) as u8;
                 } else {
                     // 7 bits of data + 1 parity bit
-                    let dr_value = self.reg.read_dr()?.get();
+                    let dr_value: u32 = self.reg.read_dr()?.get();
                     rx_buffer[i] = (dr_value & 0x7F) as u8;
                 }
             }
@@ -631,7 +631,7 @@ impl<'a> UsartHandle<'a> {
     }
     
     pub fn send_data_it(&mut self, tx_buffer: &'a [u8]) -> Result<UsartState, UsartError> {
-        let tx_state = self.tx_state;
+        let tx_state: UsartState = self.tx_state;
         
         if tx_state != UsartState::BusyInTx {
             self.tx_buffer = Some(tx_buffer);
@@ -655,11 +655,11 @@ impl<'a> UsartHandle<'a> {
     }
     
     pub fn receive_data_it(&mut self, rx_buffer: &'a mut [u8], len: usize) -> Result<UsartState, UsartError> {
-        let rx_state = self.rx_state;
+        let rx_state: UsartState = self.rx_state;
         
         if rx_state != UsartState::BusyInRx {
             // Get the buffer length
-            let buffer_len = rx_buffer.len();
+            let buffer_len: usize = rx_buffer.len();
             // Calculate rx_len
             self.rx_len = len.min(buffer_len);
             // Now store the buffer
@@ -713,7 +713,7 @@ impl<'a> UsartHandle<'a> {
             if self.tx_state == UsartState::BusyInTx && self.tx_len > 0 {
                 if let Some(buffer) = self.tx_buffer {
                     if self.tx_len > 0 && !buffer.is_empty() {
-                        let index = buffer.len() - self.tx_len;
+                        let index: usize = buffer.len() - self.tx_len;
                         
                         // Send data byte
                         self.reg.write_dr(RegValue::new(buffer[index] as u32))?;
@@ -741,27 +741,27 @@ impl<'a> UsartHandle<'a> {
             // RXNE interrupt handling
             if self.rx_state == UsartState::BusyInRx && self.rx_len > 0 {
                 if let Some(buffer) = &mut self.rx_buffer {
-                    let index = buffer.len() - self.rx_len;
+                    let index: usize = buffer.len() - self.rx_len;
                     
                     if self.config.wordlength == UsartWordLength::WordLengthBits9 {
                         if self.config.parity == UsartParity::Disable {
                             // 9 bits, no parity
-                            let dr_value = self.reg.read_dr()?.get();
+                            let dr_value: u32 = self.reg.read_dr()?.get();
                             buffer[index] = (dr_value & 0xFF) as u8;
                         } else {
                             // 8 bits + parity
-                            let dr_value = self.reg.read_dr()?.get();
+                            let dr_value: u32 = self.reg.read_dr()?.get();
                             buffer[index] = (dr_value & 0xFF) as u8;
                         }
                     } else {
                         // 8-bit word length
                         if self.config.parity == UsartParity::Disable {
                             // 8 bits, no parity
-                            let dr_value = self.reg.read_dr()?.get();
+                            let dr_value: u32 = self.reg.read_dr()?.get();
                             buffer[index] = (dr_value & 0xFF) as u8;
                         } else {
                             // 7 bits + parity
-                            let dr_value = self.reg.read_dr()?.get();
+                            let dr_value: u32 = self.reg.read_dr()?.get();
                             buffer[index] = (dr_value & 0x7F) as u8;
                         }
                     }
@@ -833,7 +833,7 @@ impl Usart {
             return Err(UsartError::InvalidPeripheral);
         }
 
-        let rcc_handle = RccHandle::new()?;
+        let rcc_handle: RccHandle<'_> = RccHandle::new()?;
         rcc_handle.usart_clock_control(pusartx as u32, state)?;
         Ok(())
     }
