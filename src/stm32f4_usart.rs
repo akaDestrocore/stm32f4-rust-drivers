@@ -829,6 +829,10 @@ pub struct Usart;
 
 impl Usart {
     pub fn periph_clock_control(pusartx: *mut USARTRegDef, state: bool) -> Result<(), UsartError> {
+        if pusartx.is_null() {
+            return Err(UsartError::InvalidPeripheral);
+        }
+
         let rcc_handle = RccHandle::new()?;
         rcc_handle.usart_clock_control(pusartx as u32, state)?;
         Ok(())

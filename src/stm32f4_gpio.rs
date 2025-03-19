@@ -1,5 +1,8 @@
 use core::marker::PhantomData;
-use crate::stm32f4xx::{GPIOA, GPIOB, GPIOC, GPIOD, GPIOE, GPIOF, GPIOG, GPIOH, GPIOI, GPIORegDef, RCC, RegValue};
+use crate::stm32f4xx::{
+    GPIOA, GPIOB, GPIOC, GPIOD, GPIOE, GPIOF, GPIOG, GPIOH, GPIOI, GPIORegDef, RegValue
+};
+use crate::stm32f4_rcc::{RccHandle, RccRegister, RccError};
 
 // Error type for GPIO operations
 #[derive(Debug, Clone, Copy)]
@@ -8,6 +11,14 @@ pub enum GpioError {
     InvalidPin,
     InvalidConfiguration,
     HardwareFault,
+    RccError(RccError),
+}
+
+// Convert RccError to GpioError
+impl From<RccError> for GpioError {
+    fn from(error: RccError) -> Self {
+        GpioError::RccError(error)
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -408,7 +419,7 @@ impl<'a> GpioHandle<'a> {
 
     pub fn init(&self) -> Result<(), GpioError> {
         // Enable GPIO clock
-        Gpio::periph_clock_control(self.pgpiox, State::Enable)?;
+        Gpio::periph_clock_control(self.pgpiox, true)?;
 
         let pin = self.config.pinnumber as u8;
 
@@ -506,18 +517,14 @@ impl<'a> GpioHandle<'a> {
 pub struct Gpio;
 
 impl Gpio {
-    pub fn periph_clock_control(pgpiox: *mut GPIORegDef, state: State) -> Result<(), GpioError> {
+    pub fn periph_clock_control(pgpiox: *mut GPIORegDef, enable: bool) -> Result<(), GpioError> {
         if pgpiox.is_null() {
             return Err(GpioError::InvalidPort);
         }
         
-        let rcc_handle = crate::stm32f4_rcc::RccHandle::new()
-            .map_err(|_| GpioError::HardwareFault)?;
-            
-        let gpio_base = pgpiox as u32;
-        
-        rcc_handle.gpio_clock_control(gpio_base, state == State::Enable)
-            .map_err(|_| GpioError::HardwareFault)
+        let rcc_handle = RccHandle::new()?;
+        rcc_handle.gpio_clock_control(pgpiox as u32, enable)?;
+        Ok(())
     }
 
     pub fn deinit(pgpiox: *mut GPIORegDef) -> Result<(), GpioError> {
@@ -525,35 +532,26 @@ impl Gpio {
             return Err(GpioError::InvalidPort);
         }
         
-        let rcc_handle = crate::stm32f4_rcc::RccHandle::new()
-            .map_err(|_| GpioError::HardwareFault)?;
-        
-        let rcc_reg = &rcc_handle.rcc_reg;
-        
-        let bit_pos = if pgpiox == GPIOA {
-            0
-        } else if pgpiox == GPIOB {
-            1
-        } else if pgpiox == GPIOC {
-            2
-        } else if pgpiox == GPIOD {
-            3
-        } else if pgpiox == GPIOE {
-            4
-        } else if pgpiox == GPIOF {
-            5
-        } else if pgpiox == GPIOG {
-            6
-        } else if pgpiox == GPIOH {
-            7
-        } else if pgpiox == GPIOI {
-            8
-        } else {
-            return Err(GpioError::InvalidPort);
+        // Get GPIO bit position for reset
+        let bit_pos = match () {
+            _ if pgpiox == GPIOA => 0,
+            _ if pgpiox == GPIOB => 1,
+            _ if pgpiox == GPIOC => 2,
+            _ if pgpiox == GPIOD => 3,
+            _ if pgpiox == GPIOE => 4,
+            _ if pgpiox == GPIOF => 5,
+            _ if pgpiox == GPIOG => 6,
+            _ if pgpiox == GPIOH => 7,
+            _ if pgpiox == GPIOI => 8,
+            _ => return Err(GpioError::InvalidPort),
         };
         
-        rcc_reg.reset_peripheral("AHB1", bit_pos)
-            .map_err(|_| GpioError::HardwareFault)
+        // Get RCC handle and reset the peripheral
+        let rcc_handle = RccHandle::new()?;
+        let rcc_reg = &rcc_handle.rcc_reg;
+        rcc_reg.reset_peripheral("AHB1", bit_pos)?;
+        
+        Ok(())
     }
 
     pub fn read_pin(pgpiox: *mut GPIORegDef, pin: GpioPin) -> Result<u8, GpioError> {
@@ -658,7 +656,8 @@ pub fn init_gpio_pin_with_af(
     pull_type: GpioPullUpDown,
     output_type: GpioOutputType,
     alt_func: u8,
-) -> Result<GpioHandle<'static>, GpioError> {
+) -> Result<GpioHandle<'static>, GpioError> 
+{
     let mut handle = GpioHandle::new(port)?;
     handle.config_pin(pin, GpioMode::AlternateFunction, speed, pull_type, output_type, alt_func)?;
     handle.init()?;

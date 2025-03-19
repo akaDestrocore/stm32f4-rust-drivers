@@ -5,3 +5,4 @@ pub mod exception;
 pub mod stm32f4_gpio;
 pub mod stm32f4_rcc;
 pub mod stm32f4_usart;
+pub mod stm32f4_i2c;

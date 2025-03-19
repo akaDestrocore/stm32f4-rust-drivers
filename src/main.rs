@@ -41,7 +41,7 @@ fn delay_ms(ms: u32) {
         (*TIM6).CNT = 0;
         (*TIM6).SR = 0;
         (*TIM6).CR1 |= 1;
-        while ((*TIM6).SR & 0x1) == 0 {
+        while 0 == ((*TIM6).SR & 0x1) {
             cortex_m::asm::nop();
         }
         (*TIM6).CR1 &= !1;
