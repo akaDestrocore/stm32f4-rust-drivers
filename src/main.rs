@@ -4,12 +4,13 @@
 use core::panic::PanicInfo;
 use cortex_m_rt::entry;
 use stm32f4_rust_drivers::{
-    stm32f4xx::{TIM6},
-    stm32f4_rcc::{RccRegister, init_max_performance_clocks},
+    stm32f4xx::RegValue,
+    stm32f4_rcc::init_max_performance_clocks,
     stm32f4_gpio::{
         GpioHandle, GpioPort, GpioPin, GpioMode, GpioSpeed, 
         GpioPullUpDown, GpioOutputType, init_gpio_pin
     },
+    stm32f4_systick::{init_systick, SysTick},
 };
 
 #[cortex_m_rt::pre_init]
@@ -17,46 +18,21 @@ unsafe fn __pre_init() {
 
 }
 
-// TIM6 init
-fn init_delay_timer() {
-    let rcc_reg: RccRegister = match RccRegister::new() {
-        Ok(reg) => reg,
-        Err(_) => return,
-    };
-    
-    // Enable TIM6
-    let _ = rcc_reg.modify_apb1enr(|mut reg: stm32f4_rust_drivers::stm32f4xx::RegValue| {
-        reg.set_bits(1 << 4);
-        reg
-    });
-    
-    unsafe {
-        (*TIM6).PSC = 42000 - 1; // 42 MHz / 42000 = 1 kHz (1 ms period)
-    }
-}
-
 fn delay_ms(ms: u32) {
-    unsafe {
-        (*TIM6).ARR = ms - 1;
-        (*TIM6).CNT = 0;
-        (*TIM6).SR = 0;
-        (*TIM6).CR1 |= 1;
-        while 0 == ((*TIM6).SR & 0x1) {
-            cortex_m::asm::nop();
-        }
-        (*TIM6).CR1 &= !1;
+    let start: u32 = SysTick::get_tick();
+    while (SysTick::get_tick() - start) < ms {
+        cortex_m::asm::nop();
     }
 }
 
 #[entry]
 fn main() -> ! {
-    // Initialize system clock
-    let _ = init_max_performance_clocks();
+    // SysTick init 
+    let rcc_handle = init_max_performance_clocks().unwrap();
+    let sysclk: u32 = rcc_handle.get_sys_clock_freq();
+    let _systick_handle = init_systick(sysclk).unwrap();
     
-    // Initialize delay timer
-    init_delay_timer();
-    
-    // Initialize GPIO pins for LEDs
+    // Init LED pins
     let green_led: GpioHandle<'_> = init_gpio_pin(
         GpioPort::GpioD,
         GpioPin::Pin12,
@@ -95,12 +71,11 @@ fn main() -> ! {
     
     // infinite loop
     loop {
-        // turn on all LEDs
         green_led.toggle();
         orange_led.toggle();
         red_led.toggle();
         blue_led.toggle();
-        
+
         delay_ms(2000);
     }
 }

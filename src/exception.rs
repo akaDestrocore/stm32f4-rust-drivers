@@ -43,5 +43,5 @@ unsafe fn PendSV() {
 
 #[exception]
 unsafe fn SysTick() {
-    loop {}
+    crate::stm32f4_systick::SysTick::increment_tick();
 }
