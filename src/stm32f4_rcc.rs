@@ -1,5 +1,6 @@
 use core::marker::PhantomData;
-use crate::stm32f4xx::{RCC, FLASH_R, RCCRegDef, FLASHRegDef, RegValue};
+use crate::stm32f4xx::{RCC, RCCRegDef, RegValue};
+use crate::stm32f4_flash::{FlashRegister as Flash_Register, FlashError};
 
 // Error type for RCC
 #[derive(Debug, Clone, Copy)]
@@ -7,6 +8,16 @@ pub enum RccError {
     InvalidConfiguration,
     HardwareFault,
     Timeout,
+}
+
+// Convert FlashErr to RccErr
+impl From<FlashError> for RccError {
+    fn from(error: FlashError) -> Self {
+        match error {
+            FlashError::Timeout => RccError::Timeout,
+            _ => RccError::HardwareFault,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -743,62 +754,16 @@ impl RccRegister {
     }
 }
 
-// FLASH register access
-struct FlashRegister {
-    register: *mut FLASHRegDef,
-}
-
-impl FlashRegister {
-    pub fn new() -> Result<Self, RccError> {
-        if FLASH_R.is_null() {
-            return Err(RccError::HardwareFault);
-        }
-        
-        Ok(FlashRegister { register: FLASH_R })
-    }
-    
-    // Read ACR register
-    pub fn read_acr(&self) -> Result<RegValue, RccError> {
-        if self.register.is_null() {
-            return Err(RccError::HardwareFault);
-        }
-        
-        let value: u32 = unsafe { (*self.register).ACR };
-        Ok(RegValue::new(value))
-    }
-    
-    // Write ACR register
-    pub fn write_acr(&self, value: RegValue) -> Result<(), RccError> {
-        if self.register.is_null() {
-            return Err(RccError::HardwareFault);
-        }
-        
-        unsafe {
-            (*self.register).ACR = value.get();
-        }
-        
-        Ok(())
-    }
-    
-    // Modify ACR register
-    pub fn modify_acr<F>(&self, f: F) -> Result<(), RccError> 
-    where F: FnOnce(RegValue) -> RegValue {
-        let value: RegValue = self.read_acr()?;
-        let new_value: RegValue = f(value);
-        self.write_acr(new_value)
-    }
-}
-
 pub struct RccHandle<'a> {
     pub rcc_reg: RccRegister,
-    flash_reg: FlashRegister,
+    flash_reg: Flash_Register,
     _marker: PhantomData<&'a ()>,
 }
 
 impl<'a> RccHandle<'a> {
     pub fn new() -> Result<Self, RccError> {
         let rcc_reg: RccRegister = RccRegister::new()?;
-        let flash_reg: FlashRegister = FlashRegister::new()?;
+        let flash_reg: Flash_Register = Flash_Register::new()?;
         
         Ok(RccHandle {
             rcc_reg,
@@ -1322,6 +1287,10 @@ impl<'a> RccHandle<'a> {
             TIM14_BASE => self.rcc_reg.enable_peripheral_clock("APB1", 8, enable),
             _ => Err(RccError::InvalidConfiguration),
         }
+    }
+
+    pub fn flash_clock_control(&self, enable: bool) -> Result<(), RccError> {
+        self.rcc_reg.enable_peripheral_clock("AHB1", 8, enable)
     }
 }
 

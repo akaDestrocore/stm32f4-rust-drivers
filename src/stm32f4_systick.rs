@@ -1,3 +1,5 @@
+#![allow(non_upper_case_globals)]
+#![allow(non_snake_case)]
 use core::sync::atomic::{AtomicU32, Ordering};
 use core::marker::PhantomData;
 use crate::stm32f4xx::{SCS_BASE, RegValue};
@@ -5,7 +7,7 @@ use crate::stm32f4xx::{SCS_BASE, RegValue};
 // milis counter
 static MILLIS: AtomicU32 = AtomicU32::new(0);
 
-// Errrot types for SysTick
+// Тип ошибок для SysTick
 #[derive(Debug, Clone, Copy)]
 pub enum SysTickError {
     InitializationFailed,
@@ -23,7 +25,7 @@ pub struct SysTickRegDef {
 
 // SysTick constants
 pub const SysTick_BASE: u32 = SCS_BASE + 0x0010;
-pub const SysTick: *mut SysTickRegDef = SysTick_BASE as *mut SysTickRegDef;
+pub const SYSTICK_REGS: *mut SysTickRegDef = SysTick_BASE as *mut SysTickRegDef;
 
 pub struct SysTickRegister {
     reg: *mut SysTickRegDef,
@@ -31,11 +33,11 @@ pub struct SysTickRegister {
 
 impl SysTickRegister {
     pub fn new() -> Result<Self, SysTickError> {
-        if SysTick.is_null() {
+        if SYSTICK_REGS.is_null() {
             return Err(SysTickError::HardwareFault);
         }
         
-        Ok(SysTickRegister { reg: SysTick })
+        Ok(SysTickRegister { reg: SYSTICK_REGS })
     }
     
     // CTRL register
@@ -44,7 +46,7 @@ impl SysTickRegister {
             return Err(SysTickError::HardwareFault);
         }
         
-        let value = unsafe { (*self.reg).CTRL };
+        let value: u32 = unsafe { (*self.reg).CTRL };
         Ok(RegValue::new(value))
     }
     
@@ -63,7 +65,7 @@ impl SysTickRegister {
     pub fn modify_ctrl<F>(&self, f: F) -> Result<(), SysTickError> 
     where F: FnOnce(RegValue) -> RegValue {
         let value = self.read_ctrl()?;
-        let new_value = f(value);
+        let new_value: RegValue = f(value);
         self.write_ctrl(new_value)
     }
     
@@ -73,7 +75,7 @@ impl SysTickRegister {
             return Err(SysTickError::HardwareFault);
         }
         
-        let value = unsafe { (*self.reg).LOAD };
+        let value: u32 = unsafe { (*self.reg).LOAD };
         Ok(RegValue::new(value))
     }
     
@@ -95,7 +97,7 @@ impl SysTickRegister {
             return Err(SysTickError::HardwareFault);
         }
         
-        let value = unsafe { (*self.reg).VAL };
+        let value: u32 = unsafe { (*self.reg).VAL };
         Ok(RegValue::new(value))
     }
     
@@ -111,7 +113,7 @@ impl SysTickRegister {
         Ok(())
     }
     
-    // For operations that need direct access
+    // for operations that need direct access
     pub fn get_raw_ptr(&self) -> *mut SysTickRegDef {
         self.reg
     }
@@ -125,7 +127,7 @@ pub struct SysTickHandle<'a> {
 
 impl<'a> SysTickHandle<'a> {
     pub fn new() -> Result<Self, SysTickError> {
-        let register = SysTickRegister::new()?;
+        let register: SysTickRegister = SysTickRegister::new()?;
         
         Ok(SysTickHandle {
             psystick: register.get_raw_ptr(),
@@ -136,7 +138,7 @@ impl<'a> SysTickHandle<'a> {
     
     pub fn init(&self, system_core_clock: u32) -> Result<(), SysTickError> {
         // Calculate reload value
-        let reload_value = system_core_clock / 1000 - 1;
+        let reload_value: u32 = system_core_clock / 1000 - 1;
         
         // Configure SysTick
         self.register.write_load(RegValue::new(reload_value))?;
@@ -156,7 +158,7 @@ impl<'a> SysTickHandle<'a> {
 pub struct SysTick;
 
 impl SysTick {
-    // this must be called from Systick irq handler
+    // call this from SysTick handler
     pub fn increment_tick() {
         let current = MILLIS.load(Ordering::Relaxed);
         MILLIS.store(current + 1, Ordering::Relaxed);
